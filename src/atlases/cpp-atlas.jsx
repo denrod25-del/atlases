@@ -1,0 +1,3742 @@
+import { useState, useEffect, useRef } from 'react';
+import {
+  Compass, Cpu, Layers, ArrowRight, Boxes, GitBranch, Activity,
+  Package, Terminal, Wrench, BookOpen, Check, ChevronRight, ChevronLeft,
+  Copy, X, Search, RotateCcw, Play, ArrowLeft, Quote, MousePointerClick,
+  Loader2, Library, AlertTriangle, HardDrive, Clock, ExternalLink,
+  XCircle, Zap
+} from 'lucide-react';
+
+/* ═══════════════════════════════════════════════════════════════
+   C++ ATLAS · DATA
+   ═══════════════════════════════════════════════════════════════ */
+
+const SECTIONS = [
+  { id: 'origin', label: 'Origin', icon: Compass, num: '01', sub: "Stroustrup, 1979. From 'C with Classes' through C++26 in 2026." },
+  { id: 'toolchain', label: 'Toolchain', icon: Cpu, num: '02', sub: "g++ / clang++ / MSVC, CMake, sanitizers, ABI, and why builds are hard." },
+  { id: 'bedrock', label: 'Bedrock', icon: Layers, num: '03', sub: "Types, references vs pointers, const, constexpr, value categories." },
+  { id: 'classes', label: 'Classes & RAII', icon: GitBranch, num: '04', sub: "Constructors, destructors, rule of 0/3/5, move semantics. The killer idiom." },
+  { id: 'memory', label: 'Memory', icon: HardDrive, num: '05', sub: "Smart pointers, new/delete (don't), ownership, custom allocators." },
+  { id: 'templates', label: 'Templates', icon: Layers, num: '06', sub: "Generics, type traits, SFINAE → concepts (C++20), variadic, CRTP." },
+  { id: 'stl', label: 'STL', icon: Boxes, num: '07', sub: "Containers, iterators, algorithms, ranges (C++20), views." },
+  { id: 'modern', label: 'Modern C++', icon: Clock, num: '08', sub: "C++11 through C++26. Reflection, contracts, senders/receivers." },
+  { id: 'library', label: 'Library', icon: Library, num: '09', sub: "Curated snippets — RAII recipes, smart-pointer idioms, STL patterns." },
+  { id: 'sandbox', label: 'Sandbox', icon: Terminal, num: '10', sub: "Real C++ in your browser via JSCPP. Six progressive challenges." },
+  { id: 'triage', label: 'Triage', icon: Wrench, num: '11', sub: "Object slicing, dangling refs, the UB catalog. Common errors decoded." },
+  { id: 'atlas', label: 'Atlas', icon: BookOpen, num: '12', sub: "Core Guidelines, books, the C++ reading roadmap." },
+];
+
+const STACKS = [
+  { id: 'systems', label: 'Systems / OS / runtime', desc: 'Kernels, drivers, language runtimes, libc++', icon: '⚙' },
+  { id: 'games', label: 'Games / engines / graphics', desc: 'Unreal, Unity native, custom engines, AAA', icon: '◐' },
+  { id: 'finance', label: 'Finance / HFT / scientific', desc: 'Low-latency trading, quant, HPC, simulation', icon: '∑' },
+  { id: 'apps', label: 'Apps / desktop / services', desc: 'Qt, GUI apps, backend services', icon: '▣' },
+  { id: 'fundamentals', label: 'Just the language, properly', desc: 'Language mastery first', icon: '∷' },
+];
+
+const GLOSSARY = {
+  Reference: "An alias for an existing object. `int &r = x;` — r and x refer to the same memory. Cannot be reseated. Different from pointer: no null reference, no reference arithmetic, no rebind.",
+  "Lvalue reference": "T& — binds to lvalues (named objects). `int& r = x;`. Cannot bind to temporaries. The classic 'reference.'",
+  "Rvalue reference": "T&& — binds to rvalues (temporaries, results of std::move). The basis of move semantics (C++11). Enables transferring resources cheaply.",
+  "Value category": "Every expression has a value category. lvalue (has a name, can take address), prvalue (pure rvalue — a temporary or literal), xvalue (eXpiring — about to be moved from). glvalue = lvalue | xvalue. rvalue = prvalue | xvalue.",
+  RAII: "Resource Acquisition Is Initialization. Resource lifetime tied to object lifetime — constructor acquires, destructor releases. Automatic with stack objects. The single most important C++ idiom.",
+  Destructor: "~ClassName() — runs when an object's lifetime ends. The hook that makes RAII work. Called for stack objects at scope exit; for heap, when delete/unique_ptr/shared_ptr triggers it.",
+  "Special member": "The six functions the compiler may auto-generate: default constructor, destructor, copy constructor, copy assignment, move constructor, move assignment. The 'Rule of 0/3/5' governs when to define them.",
+  "Rule of 0": "If your class has no resources to manage manually (just uses RAII members like std::vector, std::unique_ptr), define NONE of the six special members. Compiler-generated defaults are correct. The modern default.",
+  "Rule of 5": "If you define ANY of {destructor, copy ctor, copy assign, move ctor, move assign}, you usually need to define ALL FIVE — or = default / = delete them explicitly. The old Rule of 3 + C++11's move members.",
+  Constructor: "Special member that initializes an object. Called when the object is created. May overload (multiple constructors). The member initializer list `: x(1), y(2)` is the canonical way to init fields.",
+  "Copy constructor": "T(const T& other) — used when constructing from another T. Compiler-generated by default (memberwise copy). Define your own when memberwise isn't right.",
+  "Move constructor": "T(T&& other) noexcept — steals resources from a soon-to-die object. Cheap. Used when constructing from an rvalue (literal, std::move result, function return).",
+  "std::move": "A cast to rvalue reference — doesn't move anything itself, just tells the compiler 'I'm done with this; you may move from it.' After std::move(x), x is in a valid-but-unspecified state.",
+  "Smart pointer": "RAII wrapper around a raw pointer. std::unique_ptr (sole ownership), std::shared_ptr (shared, reference-counted), std::weak_ptr (non-owning observer for shared_ptr).",
+  unique_ptr: "Sole ownership. Move-only (not copyable). Zero overhead vs raw pointer. The default modern choice for heap allocation. Always use make_unique<T>(args...).",
+  shared_ptr: "Reference-counted shared ownership. Copyable. Atomic refcount = overhead. Use only when ownership genuinely shared. make_shared<T>(args...) is preferred (single allocation for object + control block).",
+  weak_ptr: "Non-owning observer of a shared_ptr. Doesn't extend lifetime. Breaks cycles. Call .lock() to get a temporary shared_ptr.",
+  Template: "A blueprint generating types or functions from type parameters. `template<typename T> T max(T a, T b);`. Instantiated per type. Compile-time mechanism — no runtime cost.",
+  "Type trait": "Compile-time predicate on a type. std::is_integral_v<T>, std::is_same_v<A, B>. Used in templates to gate behavior on properties.",
+  Concept: "C++20 named constraint on a template parameter. `template<std::integral T>` is cleaner than SFINAE. Better error messages. The future of generic constraints.",
+  SFINAE: "Substitution Failure Is Not An Error. Pre-C++20 technique to enable/disable templates based on types. Painful syntax — concepts replaced it in C++20 for most uses.",
+  CRTP: "Curiously Recurring Template Pattern. `template<typename Derived> class Base { ... static_cast<Derived&>(*this) ... };`. Compile-time polymorphism — zero runtime cost, no virtual.",
+  Iterator: "Object representing a position in a container. Increment moves it. *it dereferences. begin()/end() bound a range. Five categories: input, output, forward, bidirectional, random-access (+ contiguous in C++17).",
+  Range: "C++20 abstraction: anything with begin() and end(). Algorithms can take ranges directly: std::ranges::sort(vec) instead of std::sort(vec.begin(), vec.end()).",
+  View: "Lazy, composable range adapter (C++20 ranges). `vec | std::views::filter(pred) | std::views::transform(f)`. No allocation, no eager evaluation.",
+  Lambda: "Anonymous function object. `[capture](args) -> ret { body }`. C++11. Captures: [&] by ref, [=] by value, [this], [x, &y] explicit.",
+  Closure: "The object created by a lambda expression at runtime. Has captured state. Each lambda expression creates a unique closure type.",
+  constexpr: "Compile-time constant. `constexpr int N = 42;`. Function form: can be evaluated at compile time given constant inputs.",
+  consteval: "C++20. MUST be evaluated at compile time — like constexpr but stricter. consteval int sq(int x) { return x*x; }",
+  noexcept: "Function declaration: this won't throw. Enables optimizations (move ctors should be noexcept for std::vector to move on resize). Violation = std::terminate.",
+  "Object slicing": "When you copy a derived object into a base by value: the derived parts get sliced off. `Base b = derived;` keeps only base members. Polymorphism is lost. Use references/pointers for polymorphic code.",
+  vtable: "Virtual table. Hidden per-class array of function pointers. Each polymorphic object has a hidden pointer to its class's vtable. Virtual calls go through it.",
+  ADL: "Argument-Dependent Lookup (Koenig lookup). When you call f(x), compiler looks for f not just in current scope but also in namespaces of x's type. Why `std::cout << x` finds operator<< for x's type.",
+  ABI: "Application Binary Interface. The contract for compiled code: name mangling, calling convention, struct layout, vtable layout. C++ ABI is famously unstable — recompile dependencies when you change toolchains.",
+  "Header-only": "Library shipped as just .hpp files. No separate compilation. Easy to integrate. Templates often force this (definitions must be visible).",
+  "Translation unit": "One .cpp file plus all its #included headers, after preprocessing. The compiler operates on one TU at a time. Linker stitches them.",
+  Linkage: "Whether a name is visible across translation units. external (default for non-const globals/functions), internal (static or anonymous namespace), no linkage (block-scope).",
+  Inline: "Old meaning: hint to inline at call site. Modern meaning (post-C++17): can be defined in multiple TUs — linker picks one. The mechanism for header-only definitions.",
+  Module: "C++20. Replacement for headers. import std; instead of #include <iostream>. Faster compilation, isolation from macros, better encapsulation. Tooling still maturing in 2026.",
+  Coroutine: "C++20. Function that can suspend and resume. Uses co_await, co_yield, co_return. Foundation for async, generators. The library half (std::execution) shipped in C++26.",
+  Reflection: "C++26 (P2996). Compile-time introspection — `^T` reflects a type, `[:expr:]` splices. Generate code from type information. Herb Sutter calls it the biggest upgrade since templates.",
+  Contracts: "C++26 (P2900). Language-level preconditions, postconditions, assertions: `void f(int x) pre(x > 0) post(r: r > x);`. Standardizes what assert() did informally.",
+  "Senders/Receivers": "C++26 (P2300, std::execution). Composable async framework. Senders = units of work. Receivers = callbacks (value/error/stopped channels). Schedulers = where work runs.",
+  "PIMPL": "Pointer to IMPLementation. Hide class internals behind an opaque pointer: `class Widget { struct Impl; std::unique_ptr<Impl> p; };`. Reduces compile coupling; preserves ABI.",
+  Pure: "A virtual function with `= 0` — pure virtual. Makes the class abstract; can't instantiate it directly. The C++ way to declare an interface.",
+};
+
+const QUIZZES = {
+  origin: [
+    {
+      qid: 'o1',
+      q: "C++ was created in…",
+      opts: [ "1972 at Bell Labs by Dennis Ritchie", "1979 at Bell Labs by Bjarne Stroustrup", "1985 at MIT" ],
+      a: 1,
+      x: "Bjarne Stroustrup started C++ in 1979 at Bell Labs as 'C with Classes' — adding Simula's object-oriented ideas to C's efficiency. Renamed C++ in 1983 (Rick Mascitti's joke about C's increment operator). The book 'The C++ Programming Language' appeared in 1985."
+    },
+    {
+      qid: 'o2',
+      q: "What's the current C++ standard as of May 2026?",
+      opts: [ "C++20 — modules and concepts", "C++23 — std::expected, multidim subscript", "C++26 — reflection, contracts, senders/receivers (just finalized March 2026)" ],
+      a: 2,
+      x: "C++26 was finalized at the London WG21 meeting March 28, 2026. Three landmark features: static reflection (P2996), contracts (P2900), and std::execution senders/receivers (P2300). The most significant upgrade since C++11. GCC 14+ and Clang already implement most of it experimentally."
+    },
+    {
+      qid: 'o3',
+      q: "C++11 is often called 'the modern C++ revolution.' Why?",
+      opts: [
+        "It removed C compatibility",
+        "It introduced auto, lambdas, smart pointers, move semantics, range-for, nullptr, and standard threads — fundamentally changing how C++ is written",
+        "It added garbage collection"
+      ],
+      a: 1,
+      x: "Pre-C++11 (called 'C++03') is now widely called 'legacy C++'. C++11 (2011) added: auto type deduction, lambda expressions, move semantics + rvalue references, smart pointers (unique_ptr, shared_ptr, weak_ptr), range-based for, nullptr, std::thread, variadic templates, constexpr. The book changed."
+    },
+  ],
+  toolchain: [
+    {
+      qid: 't1',
+      q: "Why is CMake essentially required for serious C++ projects?",
+      opts: [
+        "It runs faster than Make",
+        "C++ has cross-platform build complexity (templates, ABI, headers, multi-compiler) — CMake generates the right Makefile/Ninja/MSBuild for each platform from one CMakeLists.txt",
+        "It's mandated by ISO"
+      ],
+      a: 1,
+      x: "Plain Make works fine for small C projects. C++ adds: template instantiation across TUs, complex header dependencies, ABI compatibility checks, third-party library integration (vcpkg, Conan, FetchContent), and the need for Linux/macOS/Windows builds from one source. CMake (and newer alternatives like Meson) handle this complexity. The 'modern CMake' style (targets, not variables) is what to learn — many tutorials show the bad 1990s style."
+    },
+    {
+      qid: 't2',
+      q: "Compile with which flags during C++ development?",
+      opts: [
+        "-O2 only",
+        "-std=c++23 -Wall -Wextra -Wpedantic -Werror -g -fsanitize=address,undefined",
+        "-std=c++98 for maximum compatibility"
+      ],
+      a: 1,
+      x: "C++23 (or c++26 if you're early-adopting) for current standard. -Wall -Wextra -Wpedantic for warnings. -Werror to enforce. -g for debug symbols. -fsanitize=address,undefined for AddressSanitizer + UBSAN — catches the bugs static analysis can't. ~2x slower but worth it for dev builds."
+    },
+    {
+      qid: 't3',
+      q: "The C++ ABI is famously…",
+      opts: [
+        "Stable across compilers — that's the point",
+        "Unstable. Different compilers / standard library versions can produce incompatible binaries. Recompile everything when you change toolchains. The Itanium ABI is the de facto standard on Linux/macOS, MSVC has its own.",
+        "Identical to C ABI"
+      ],
+      a: 1,
+      x: "C++ has name mangling, virtual tables, exception unwinding tables, std::string layout (libstdc++ vs libc++ differ), iterator debugging modes. All of these can break ABI. The standards committee has talked for years about 'ABI break' — controversial because real codebases lock to specific toolchain versions. For libraries: prefer header-only or stable C APIs at boundaries."
+    },
+  ],
+  bedrock: [
+    {
+      qid: 'b1',
+      q: "References vs pointers — what's the key difference?",
+      opts: [
+        "They're the same thing",
+        "References are aliases — cannot be null, cannot be reseated. Pointers are objects — can be null, can be reassigned, can do arithmetic.",
+        "Pointers are faster"
+      ],
+      a: 1,
+      x: "Use a reference when you mean 'this MUST refer to something, and only this one thing.' Use a pointer when nullability or rebinding matters. Modern C++ uses references heavily for function parameters and return values; raw pointers for optional/nullable, or never (smart pointers instead)."
+    },
+    {
+      qid: 'b2',
+      q: "constexpr vs consteval vs const — what's the difference?",
+      opts: [
+        "Different spellings of the same thing",
+        "const: runtime constant. constexpr: can be evaluated at compile time IF inputs are constant. consteval (C++20): MUST be evaluated at compile time.",
+        "constexpr is deprecated"
+      ],
+      a: 1,
+      x: "const just means 'I won't modify this through this name.' constexpr promises compile-time-evaluable when used with constant inputs (but can also run at runtime). consteval is the strictest: a consteval function can ONLY be called from constant expressions. constinit (C++20) ensures compile-time initialization but allows runtime mutation."
+    },
+    {
+      qid: 'b3',
+      q: "`int&& r = 5;` — what is r?",
+      opts: [
+        "A reference to a temporary int. r is an LVALUE (despite the &&), bound to the temporary, which lives as long as r does.",
+        "Illegal",
+        "Same as int& r = 5"
+      ],
+      a: 0,
+      x: "Named rvalue references are lvalues — they have a name. That's why `std::move(x)` is needed inside functions to convert the lvalue back to an rvalue when you want move behavior. Rule: rvalue-ref-ness is in the TYPE; lvalue-ness is in the EXPRESSION's value category. This trips up everyone learning move semantics."
+    },
+  ],
+  classes: [
+    {
+      qid: 'cl1',
+      q: "What's RAII?",
+      opts: [
+        "Random Access Iteration Idiom",
+        "Resource Acquisition Is Initialization — bind resource lifetime to object lifetime. Constructor acquires, destructor releases. Stack objects → automatic cleanup at scope exit.",
+        "A debugging technique"
+      ],
+      a: 1,
+      x: "RAII is THE C++ idiom. std::lock_guard for mutexes, std::unique_ptr for heap, std::ofstream for files, std::scoped_lock for multi-mutex. Every resource (memory, file handle, lock, GL context, socket) wrapped in a class whose destructor releases. Combined with stack allocation → exception-safe automatic cleanup. C# 'using', Python 'with', Java try-with-resources are all RAII descendants."
+    },
+    {
+      qid: 'cl2',
+      q: "Rule of 0, 3, or 5 — what's the modern preferred default?",
+      opts: [
+        "Rule of 3 — copy ctor, copy assign, destructor",
+        "Rule of 0 — use RAII members (vector, unique_ptr, etc.) so you don't need to define ANY special members. Modern default.",
+        "Rule of 5 — always define all five"
+      ],
+      a: 1,
+      x: "Rule of 0: if your members are all RAII-managed, the compiler-generated special members are correct. Don't write a destructor, copy/move constructor, copy/move assignment — let the compiler. Rule of 5 (C++11): if you DO need a custom destructor, you likely need to define all five (or = default / = delete them explicitly). C++ Core Guidelines C.20 and C.21."
+    },
+    {
+      qid: 'cl3',
+      q: "Why should move constructors be `noexcept`?",
+      opts: [
+        "Optional optimization",
+        "std::vector and other containers check is_nothrow_move_constructible<T> to decide whether to MOVE or COPY elements during reallocation. Throwing moves force copies — destroying the point of moves.",
+        "It's syntactic style"
+      ],
+      a: 1,
+      x: "Containers need strong exception guarantee on reallocation. If move can throw, the partially-moved state is irrecoverable. So they copy instead — slow. noexcept move ctor signals 'safe to use during reallocation.' Forgetting noexcept on move is a silent performance bug. Every move ctor should be noexcept (and the compiler-generated one usually is, but check)."
+    },
+  ],
+  memory: [
+    {
+      qid: 'mem1',
+      q: "When should you use raw `new` in modern C++?",
+      opts: [
+        "Always — it's the standard way",
+        "Almost never. Use make_unique<T> for sole ownership, make_shared<T> for shared ownership, stack allocation otherwise. Raw new survives in low-level code (placement new, custom allocators).",
+        "Only with delete[] for arrays"
+      ],
+      a: 1,
+      x: "C++ Core Guidelines R.11: 'Avoid calling new and delete explicitly.' make_unique (C++14) and make_shared (C++11) handle allocation + construction atomically and pair with the smart pointer's deleter. Manual new/delete is the source of most C++ memory bugs. The Library chapter has smart-pointer recipes."
+    },
+    {
+      qid: 'mem2',
+      q: "unique_ptr vs shared_ptr — when to use which?",
+      opts: [
+        "Always shared_ptr for safety",
+        "unique_ptr by default (sole ownership, zero overhead). shared_ptr only when ownership IS genuinely shared (cache, async tasks, observer with lifetime). shared_ptr has atomic refcount = real cost.",
+        "They're interchangeable"
+      ],
+      a: 1,
+      x: "Rule: prefer unique_ptr. Move it where ownership transfers. If multiple owners genuinely needed, then shared_ptr. shared_ptr's atomic refcount inc/dec is several ns per operation — adds up. shared_ptr also has the cycle problem (need weak_ptr to break). 'Shared by default' is an anti-pattern."
+    },
+    {
+      qid: 'mem3',
+      q: "Two shared_ptrs to each other (A holds shared_ptr<B>, B holds shared_ptr<A>) — what happens?",
+      opts: [
+        "Compiler error",
+        "Reference cycle — neither's refcount ever reaches 0 — memory leak. Break with weak_ptr on one side.",
+        "Garbage collected automatically"
+      ],
+      a: 1,
+      x: "shared_ptr is REFERENCE COUNTED, not GARBAGE COLLECTED. Cycles don't reach 0. weak_ptr is the answer: non-owning observer. Typical pattern: parent holds shared_ptr<Child>, child holds weak_ptr<Parent>. Call .lock() on weak_ptr to get a temporary shared_ptr."
+    },
+  ],
+  templates: [
+    {
+      qid: 'tp1',
+      q: "What does this give you?\n`template<std::integral T> T add(T a, T b) { return a + b; }`",
+      opts: [
+        "Compile error",
+        "A function template constrained by a C++20 concept — only instantiates if T satisfies std::integral. Cleaner than SFINAE; better error messages.",
+        "Runtime type checking"
+      ],
+      a: 1,
+      x: "C++20 concepts. The constraint `std::integral` is a named requirement. Templates ENABLE only when the constraint holds; error messages point at the constraint, not deep into substitution failure. Pre-C++20 you'd write `template<typename T, typename = std::enable_if_t<std::is_integral_v<T>>>` — same effect, much worse readability."
+    },
+    {
+      qid: 'tp2',
+      q: "CRTP (Curiously Recurring Template Pattern) does what?",
+      opts: [
+        "Adds runtime type information",
+        "Compile-time polymorphism: a base template parameterized on the derived class. Static dispatch via static_cast — no virtual table cost.",
+        "Helps with macro expansion"
+      ],
+      a: 1,
+      x: "`template<typename D> struct Base { void interface() { static_cast<D*>(this)->impl(); } };`. The derived class then `class Derived : public Base<Derived> { void impl() {} };`. Used in std::enable_shared_from_this, expression templates (Eigen), policy-based design. Compile-time only — zero runtime cost."
+    },
+  ],
+  stl: [
+    {
+      qid: 'stl1',
+      q: "Which container has O(1) random access AND contiguous memory?",
+      opts: [
+        "std::list",
+        "std::vector — array-backed, indexable, cache-friendly. The default container until you have a reason otherwise.",
+        "std::map"
+      ],
+      a: 1,
+      x: "std::vector is what you should reach for first. O(1) random access, contiguous (cache-friendly), O(1) amortized push_back. std::array if size is compile-time known. std::deque for double-ended efficient push/pop. std::list almost never — its O(1) splice rarely outweighs cache cost."
+    },
+    {
+      qid: 'stl2',
+      q: "C++20 ranges: `std::ranges::sort(vec)` vs `std::sort(vec.begin(), vec.end())` — which is preferred?",
+      opts: [
+        "The begin/end form — it's the standard",
+        "ranges::sort — same operation, no boilerplate, composes with views (filter, transform). The modern style.",
+        "They behave differently"
+      ],
+      a: 1,
+      x: "Ranges algorithms (C++20) take ranges directly. Composes cleanly: `auto evens = vec | std::views::filter([](int x){ return x%2==0; });`. The Big Four of C++20 (concepts, ranges, modules, coroutines) — ranges is the most immediately useful for everyday code."
+    },
+  ],
+  modern: [
+    {
+      qid: 'm1',
+      q: "What's the marquee feature of C++26?",
+      opts: [
+        "Faster compilation",
+        "Static reflection (P2996) — compile-time introspection. Sutter calls it 'the biggest upgrade since templates.' Plus contracts (P2900) and senders/receivers (P2300, std::execution).",
+        "Garbage collection"
+      ],
+      a: 1,
+      x: "Reflection lets C++ describe itself. `^T` reflects a type; `[:expr:]` splices it back. Generate boilerplate (serialization, ORM mappings, RPC stubs) at compile time. C++26 was finalized March 28, 2026 in London. GCC 14+ and Clang already implement most of it experimentally."
+    },
+    {
+      qid: 'm2',
+      q: "std::expected (C++23) replaces…",
+      opts: [
+        "std::variant",
+        "Manual error handling with sentinel values or pairs. `std::expected<T, E>` holds a T on success or E on failure. Compositional, type-safe, no exceptions. Like Rust's Result.",
+        "exceptions entirely"
+      ],
+      a: 1,
+      x: "`std::expected<int, ParseError> parse(string)` — returns either the int or a structured error. Use .has_value(), .value(), .error(). Composes with .and_then() (monadic operations, C++23). Best of both worlds: explicit error path like return codes, but type-safe and composable."
+    },
+  ],
+  atlas: [
+    {
+      qid: 'at1',
+      q: "What separates competent C++ programmers from senior ones?",
+      opts: [
+        "Memorizing every STL algorithm",
+        "Fluent ownership reasoning (smart pointers, move semantics), deep RAII intuition, template + concept fluency, and respect for the UB catalog. Plus knowing when NOT to write C++ (sometimes C, Rust, or a script is the right answer).",
+        "Memorizing C++26 reflection"
+      ],
+      a: 1,
+      x: "C++ is the largest mainstream language by surface area. Mastery is decades. The leverage skills are the ones that apply to every codebase: who owns this memory, where can this throw, what does this template require, where is the unspecified behavior. Tools (sanitizers, static analyzers, the Core Guidelines) compress the time to competence."
+    },
+  ],
+};
+
+const COMPARISONS = {
+  smart_ptrs: {
+    title: 'Smart pointer choice',
+    headers: ['Type', 'Ownership', 'Cost', 'Copyable', 'When to use'],
+    rows: [
+      ['std::unique_ptr<T>', 'Sole', 'Zero overhead vs raw', 'No (move-only)', "Default for heap allocation. Most cases."],
+      ['std::shared_ptr<T>', 'Shared, refcounted', 'Atomic refcount; 2 allocs (or 1 via make_shared)', 'Yes', "Truly shared ownership (caches, observers, async tasks)."],
+      ['std::weak_ptr<T>', 'Non-owning observer', 'Refcount peek', 'Yes', "Break shared_ptr cycles. Optional access without keeping alive."],
+      ['T* (raw)', 'None — pure observer', 'Zero', 'Yes', "Non-owning function parameters where references won't do (nullable)."],
+      ['T& (reference)', 'None — pure observer', 'Zero', 'No', "Non-owning, non-null function parameters. The default."],
+    ],
+  },
+  containers: {
+    title: 'STL container Big-O',
+    headers: ['Container', 'Index', 'Insert front', 'Insert back', 'Insert middle', 'Find'],
+    rows: [
+      ['std::vector', 'O(1)', 'O(n)', 'O(1) amort.', 'O(n)', 'O(n)'],
+      ['std::deque', 'O(1)', 'O(1)', 'O(1)', 'O(n)', 'O(n)'],
+      ['std::list', 'O(n)', 'O(1)', 'O(1)', 'O(1) at iter', 'O(n)'],
+      ['std::forward_list', '—', 'O(1)', '—', 'O(1) at iter', 'O(n)'],
+      ['std::array<T,N>', 'O(1)', '—', '—', '—', 'O(n)'],
+      ['std::map', 'O(log n)', 'O(log n)', 'O(log n)', '—', 'O(log n)'],
+      ['std::unordered_map', 'O(1) avg', 'O(1) avg', 'O(1) avg', '—', 'O(1) avg'],
+      ['std::flat_map (C++23)', 'O(log n)', 'O(n)', 'O(n)', '—', 'O(log n)'],
+      ['std::set / std::unordered_set', '—', 'O(log n) / O(1)', '—', '—', 'O(log n) / O(1)'],
+    ],
+  },
+  value_categories: {
+    title: 'Value categories',
+    headers: ['Category', 'Has name?', 'Can take &?', 'Examples'],
+    rows: [
+      ['lvalue', 'Yes', 'Yes', 'named variables, function results returning T&'],
+      ['xvalue', 'No (expiring)', 'No', 'std::move(x), function results returning T&&'],
+      ['prvalue', 'No (pure)', 'No', "literals (42, 'a'), function results returning T (by value)"],
+      ['glvalue', '—', '—', 'lvalue OR xvalue (generalized lvalue)'],
+      ['rvalue', '—', '—', 'xvalue OR prvalue (about to be consumed)'],
+    ],
+  },
+  special_members: {
+    title: 'Special members & when generated',
+    headers: ['Function', 'Generated by default?', 'Default behavior'],
+    rows: [
+      ['Default constructor T()', 'Only if no other ctor declared', 'Member-by-member default init'],
+      ['Destructor ~T()', 'Always (unless deleted)', 'Member-by-member destroy in reverse order'],
+      ['Copy constructor T(const T&)', 'Yes (unless move declared)', 'Member-by-member copy'],
+      ['Copy assignment T& operator=(const T&)', 'Yes (unless move declared)', 'Member-by-member copy-assign'],
+      ['Move constructor T(T&&)', 'Yes IF no copy/destructor/assign declared', 'Member-by-member move'],
+      ['Move assignment T& operator=(T&&)', 'Yes IF no copy/destructor/assign declared', 'Member-by-member move-assign'],
+    ],
+  },
+};
+
+const TIMELINE = [
+  {
+    ver: 'C++98', year: 1998, label: 'ISO/IEC 14882:1998',
+    features: 'Original ISO C++. Templates, exceptions, STL (vector/map/sort), namespaces, RTTI, multiple inheritance. The foundation.',
+  },
+  {
+    ver: 'C++03', year: 2003, label: 'Technical Correction',
+    features: 'Tiny update — bug fixes only. Often grouped with C++98 as "legacy C++."',
+  },
+  {
+    ver: 'C++11', year: 2011, label: 'The Modern C++ Revolution',
+    features: 'auto, lambdas, smart pointers, move semantics, range-for, nullptr, constexpr, std::thread, variadic templates, uniform initialization {}, decltype, override, final, noexcept, std::array, std::unordered_map. The biggest change ever.',
+  },
+  {
+    ver: 'C++14', year: 2014, label: 'Refinement',
+    features: 'Generic lambdas, return type deduction, std::make_unique, variable templates, [[deprecated]], digit separators 1\'000\'000.',
+  },
+  {
+    ver: 'C++17', year: 2017, label: 'Quality of life',
+    features: 'Structured bindings (auto [a, b] = pair), std::optional, std::variant, std::any, std::filesystem, parallel STL, if-init (if (auto x = f(); cond)), if constexpr, std::string_view, fold expressions.',
+  },
+  {
+    ver: 'C++20', year: 2020, label: 'The Big Four',
+    features: 'Concepts (constraint templates cleanly), Ranges (composable algorithms), Modules (import std), Coroutines. Plus: three-way comparison <=>, designated initializers, std::format, std::span, consteval, using enum.',
+  },
+  {
+    ver: 'C++23', year: 2023, label: 'Filling gaps',
+    features: 'std::expected (Result-style errors), std::flat_map, std::print/std::println, multidim subscript a[i,j], explicit this parameter, if consteval, std::generator, monadic optional. ISO published 2024.',
+  },
+  {
+    ver: 'C++26', year: 2026, label: 'Reflection, contracts, async',
+    features: 'Static reflection (P2996) — compile-time introspection. Contracts (P2900) — pre/post conditions. std::execution senders/receivers (P2300) — composable async. Plus: #embed, <simd> header, pack indexing, std::copyable_function, std::submdspan. Finalized March 28, 2026 in London.',
+  },
+];
+
+const OLD_MODERN = [
+  {
+    topic: 'Heap allocation',
+    old: `Widget* w = new Widget(args);
+// ... use ...
+delete w;   // forget this = leak; throw between = leak`,
+    modern: `auto w = std::make_unique<Widget>(args);
+// ... use ...
+// destroyed automatically when w goes out of scope`,
+    why: "make_unique is exception-safe (atomic alloc+construct), self-documenting (sole ownership), and frees automatically. No new/delete in modern code.",
+  },
+  {
+    topic: 'Iteration',
+    old: `for (std::vector<int>::iterator it = vec.begin(); it != vec.end(); ++it) {
+    *it *= 2;
+}`,
+    modern: `for (auto& x : vec) {
+    x *= 2;
+}
+// Or C++20 ranges:
+std::ranges::for_each(vec, [](int& x) { x *= 2; });`,
+    why: "Range-for (C++11) reads naturally and works on any iterable. auto avoids the verbose iterator type. Use auto& to modify, const auto& for read-only large objects, auto for cheap copies.",
+  },
+  {
+    topic: 'Type checking templates',
+    old: `// SFINAE — pre-C++20
+template<typename T, typename = std::enable_if_t<std::is_integral_v<T>>>
+T add(T a, T b) { return a + b; }`,
+    modern: `// C++20 concepts
+template<std::integral T>
+T add(T a, T b) { return a + b; }
+
+// Or even simpler:
+auto add(std::integral auto a, std::integral auto b) { return a + b; }`,
+    why: "Concepts give readable constraints and great error messages. SFINAE errors were notoriously cryptic (pages of substitution failures). The shorthand `std::integral auto` works for both template parameters and abbreviated function syntax.",
+  },
+  {
+    topic: 'Error handling',
+    old: `// Sentinel return + out-param
+int parse(const std::string& s, int& out) {
+    // returns 0 success, -1 error
+}
+
+// Or exceptions (sometimes overkill)
+int parse(const std::string& s) {
+    if (bad) throw ParseError(s);
+    return result;
+}`,
+    modern: `// C++23 std::expected
+std::expected<int, ParseError> parse(const std::string& s) {
+    if (bad) return std::unexpected(ParseError{s});
+    return result;
+}
+
+// Compose with monadic ops:
+auto n = parse(input)
+    .and_then(validate)
+    .or_else(use_default);`,
+    why: "expected<T,E> is Rust's Result. Explicit error type in the signature. No surprise exception unwinding. Composes monadically. The cleanest error path C++ has ever had.",
+  },
+  {
+    topic: 'Anonymous functions',
+    old: `struct CompareByLen {
+    bool operator()(const std::string& a, const std::string& b) const {
+        return a.size() < b.size();
+    }
+};
+std::sort(v.begin(), v.end(), CompareByLen{});`,
+    modern: `std::ranges::sort(v, {}, &std::string::size);
+// Or with a lambda:
+std::ranges::sort(v, [](auto& a, auto& b) {
+    return a.size() < b.size();
+});`,
+    why: "Lambdas (C++11) replace functor classes for almost all callback use. C++20 ranges algorithms take projections too — `&std::string::size` projects each element through .size() before comparing.",
+  },
+  {
+    topic: 'Initialization',
+    old: `// Most vexing parse: this declares a FUNCTION, not a Widget!
+Widget w();
+
+// Different syntaxes for different cases
+int x = 5;
+std::vector<int> v(10);    // 10 zero-initialized ints
+std::vector<int> v(10, 5); // 10 fives
+std::vector<int> v {10, 5}; // 2 elements: 10 and 5  (different!)`,
+    modern: `// Uniform initialization (C++11) — braces work everywhere
+Widget w {};
+int x { 5 };
+auto v = std::vector<int>{ 10, 5 };  // 2 elements
+
+// Designated initializers (C++20) for structs
+Point p { .x = 1, .y = 2 };`,
+    why: "Brace initialization avoids the most vexing parse, prevents narrowing conversions (int { 3.14 } is a compile error), and works uniformly for primitives, containers, structs. The minor wart: std::vector<int>{10} means '1 element with value 10', not '10 elements' — be aware.",
+  },
+];
+
+const ANTIPATTERNS = [
+  { name: "Raw new / delete", reason: "Use std::make_unique / std::make_shared. Manual new/delete is the source of most memory bugs. C++ Core Guidelines R.11." },
+  { name: "using namespace std; (in headers)", reason: "Pollutes every TU that includes the header. Pulls thousands of names into the global namespace, causing ambiguities. OK in .cpp scope; never in .h." },
+  { name: "C-style casts (int)x", reason: "Ambiguous — could be static_cast, reinterpret_cast, const_cast, or some combination. Use the explicit named casts: static_cast<int>(x). Searchable; constrained behavior." },
+  { name: "std::vector<bool>", reason: "Famously not a real container — packs bits, returns proxy references, breaks generic code. Use std::vector<char>, std::deque<bool>, or std::bitset<N>." },
+  { name: "Throwing destructors", reason: "Destructors should be noexcept (and are by default since C++11). Throwing during stack unwinding from another exception calls std::terminate." },
+  { name: "shared_ptr by default", reason: "unique_ptr first; shared_ptr only when ownership is genuinely shared. shared_ptr has atomic refcount overhead and the cycle problem." },
+  { name: "Macros for constants", reason: "#define PI 3.14 — no type, no scope, breaks tools. Use constexpr: constexpr double PI = 3.14;. Type-safe, scoped, debuggable." },
+  { name: "Returning const value", reason: "const Widget foo();  — the const has no purpose (you can't modify a returned prvalue anyway). Inhibits move semantics. Just return by value." },
+  { name: "endl spam", reason: "std::endl flushes the stream every time. In loops this is a huge perf hit. Use '\\n' for the newline; flush only when you need it." },
+  { name: "auto_ptr", reason: "Removed in C++17. Use unique_ptr." },
+];
+
+const COMMANDS = [
+  { cmd: 'g++ -std=c++26 -Wall -Wextra -Wpedantic -Werror -g -fsanitize=address,undefined main.cpp -o app', desc: "The dev incantation. C++26, all warnings, sanitizers on. ~2x runtime but catches the bugs static analysis can't." },
+  { cmd: 'g++ -std=c++23 -O3 -DNDEBUG -flto main.cpp -o app', desc: "Release: optimize, strip asserts, link-time optimization. Use c++23 for portability if c++26 features unused." },
+  { cmd: 'cmake -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build -j', desc: "Configure + build with CMake. -j parallelizes. Standard modern CMake workflow." },
+  { cmd: 'cmake -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -GNinja', desc: "Release build with debug info, using Ninja (faster than Make for C++)." },
+  { cmd: 'clang-format -i src/*.cpp include/*.h', desc: "Auto-format. Pair with a .clang-format file. The C++ Core Guidelines have a config." },
+  { cmd: 'clang-tidy src/main.cpp -- -std=c++23', desc: "Static analysis. Catches modernize-, performance-, readability- issues. Run in CI." },
+  { cmd: 'gdb ./app', desc: "Debug. b break, r run, n next, s step, p var, bt backtrace. lldb on macOS works similarly." },
+  { cmd: 'valgrind --leak-check=full --show-leak-kinds=all ./app', desc: "Memory diagnostics. Slower than ASAN but doesn't need rebuild. Catches leaks, uninit reads, races (helgrind)." },
+  { cmd: 'objdump -dC ./app | less', desc: "Disassemble + demangle C++ symbols. -C is the demangler. See what the compiler actually emitted." },
+  { cmd: 'nm -C ./app | grep -i symbol', desc: "List demangled C++ symbols. Diagnoses 'undefined reference' errors." },
+  { cmd: 'c++filt _ZN5MyLib6WidgetC2Ei', desc: "Demangle a single C++ symbol name to see its source form." },
+  { cmd: 'vcpkg install fmt boost-asio', desc: "Modern C++ package manager. Microsoft-backed, integrates with CMake." },
+  { cmd: 'conan install . --output-folder=build --build=missing', desc: "Alternative package manager. Mature, used by JFrog. Integrates with CMake too." },
+];
+
+const RESOURCES = [
+  { name: 'The C++ Programming Language (4th ed)', url: 'A book — Stroustrup', note: "The language creator's reference. ~1300 pages. Comprehensive but dense. Best second-pass reading after you know enough to ask questions.", kind: 'book' },
+  { name: 'A Tour of C++ (3rd ed, C++20)', url: 'A book — Stroustrup', note: "Stroustrup's short (~250 page) tour of modern C++. The best 'intro for experienced programmers.' If you read one book, this one.", kind: 'book' },
+  { name: 'Effective Modern C++', url: 'A book — Scott Meyers', note: "42 specific items for C++11/14. The way to internalize move semantics, smart pointers, lambdas. Pre-C++20 but the foundations are eternal.", kind: 'book' },
+  { name: 'C++ Core Guidelines', url: 'isocpp.github.io/CppCoreGuidelines', note: "Stroustrup + Sutter. The OFFICIAL style guide. ~200 sections. Searchable. When in doubt about a practice, search here. Free.", kind: 'spec' },
+  { name: 'cppreference.com', url: 'en.cppreference.com', note: "THE C++ reference. More accurate and complete than vendor docs. Always your first link for any std:: thing. Free, community-maintained.", kind: 'reference' },
+  { name: 'Compiler Explorer', url: 'godbolt.org', note: "Paste C++, see assembly across compilers and standards versions. Best free tool for understanding what code costs. Matt Godbolt. Free.", kind: 'tool' },
+  { name: 'C++ Weekly (Jason Turner)', url: 'youtube.com/@cppweekly', note: "Short weekly video on a specific C++ topic. ~700 episodes. Bite-sized, current, expert. Best ongoing resource for staying sharp.", kind: 'video' },
+  { name: 'CppCon talks (annual conference)', url: 'youtube.com/@CppCon', note: "Every year. Bjarne, Sean Parent, Herb Sutter, Andrei Alexandrescu, Klaus Iglberger, Jason Turner, Andreas Fertig. Free recordings.", kind: 'talks' },
+  { name: 'C++ Standards Committee papers', url: 'open-std.org/jtc1/sc22/wg21', note: "Every proposal, every meeting trip report. C++26 final draft N5046. Where you find why a feature was designed the way it was.", kind: 'spec' },
+  { name: 'C++ FAQ', url: 'isocpp.org/faq', note: "Maintained by isocpp.org. Curated answers to common questions. Decade-stable knowledge.", kind: 'reference' },
+  { name: 'Herb Sutter\'s blog', url: 'herbsutter.com', note: "Long-time WG21 chair. His trip reports are the gold standard for what's coming. Also wrote Exceptional C++ series.", kind: 'blog' },
+  { name: 'Bartek\'s coding blog (C++ stories)', url: 'cppstories.com', note: "Bartłomiej Filipek. Practical C++17/20/23 explainers with real code. Excellent for picking up modern features one at a time.", kind: 'blog' },
+];
+
+const PERSONALIZED = {
+  systems: {
+    spark: "Systems C++: tight RAII, prefer stack + arenas over malloc-equivalent, custom allocators when default heap won't do. Read libstdc++/libc++ source. Linux kernel uses C but its ecosystem (LLVM, gRPC, Folly, RocksDB) is C++.",
+    classes: "Systems: noexcept correctness everywhere. Move-only types for unique resources (file descriptors, locks). PIMPL idiom for ABI stability of public headers. Avoid exceptions in performance-critical paths (-fno-exceptions in some embedded).",
+    memory: "Systems: unique_ptr by default, never shared_ptr in hot paths (atomic refcount kills cache locality). Custom allocators with std::pmr (polymorphic memory resources) — arena and pool allocators standardized in C++17.",
+    library: "Systems: lean on the RAII patterns (scope guards, lock guards), Smart Pointers (custom deleters for OS handles), Memory (custom allocators, pmr), Build (CMake, package management).",
+  },
+  games: {
+    spark: "Games C++: data-oriented design (struct-of-arrays, ECS), per-frame arenas, never new in hot loops, profile religiously. Unreal Engine is a giant C++ codebase — UE's own conventions diverge from std::. Read the Source.",
+    classes: "Games: small object types should be trivially copyable when possible (memcpy-able). Avoid deep inheritance (vtable cache miss); prefer composition + CRTP. Move semantics for big resources (textures, meshes).",
+    memory: "Games: linear/arena/stack allocators per frame. Custom allocators via std::pmr. unique_ptr for owned resources, raw pointers for non-owning views (ECS handles). placement new for object pools.",
+    library: "Games: Memory (arenas, pool allocators), Concepts/Ranges (data transforms), STL (vector with reserve, ranges for ECS queries), Async (senders for task graphs).",
+  },
+  finance: {
+    spark: "Finance C++: lowest latency wins. Cache-friendly, branch-predictor-friendly, no allocation in hot paths. boost::lockfree, Disruptor patterns, custom message queues. The Folly library + Aeron are common reference reads.",
+    classes: "Finance: trivially destructible types whenever possible. final on classes prevents devirtualization. constexpr everything — execution at compile time is the cheapest execution. std::expected for error paths (no exception unwinding).",
+    memory: "Finance: pre-allocated pools, never new in hot paths, huge page hints, NUMA-aware allocators. Std::pmr resources for switching backing stores without code changes.",
+    library: "Finance: Memory (lock-free buffers, pre-allocated pools), Async (senders for parallel order books), Concepts/Ranges (pricing pipelines), Build (LTO, profile-guided opt).",
+  },
+  apps: {
+    spark: "Apps C++: Qt or wxWidgets for GUI, async via Qt's event loop or std::execution. CMake + vcpkg/Conan for dependencies. Cross-platform release builds. Modern C++ welcome here — no extreme performance constraints.",
+    classes: "Apps: Qt's signal/slot mechanism + C++23 std::expected for error paths. Smart pointers everywhere. PIMPL for stable plugin ABI. const correctness pays off.",
+    memory: "Apps: shared_ptr more acceptable here (UI hierarchies, plugin model). std::optional + std::variant for sum types. Standard library does most of the heavy lifting.",
+    library: "Apps: Smart Pointers (Qt parent/child semantics), STL (containers + algorithms), Concepts/Ranges (data filtering), Build (CMake + Qt integration).",
+  },
+  fundamentals: {
+    spark: "Best choice. Build language fluency BEFORE specializing. Stroustrup's 'A Tour of C++' (3rd ed, C++20), then Effective Modern C++. Type every example. Use godbolt.org as your scratch pad.",
+    classes: "Spend extra weeks on RAII + special members + move semantics. These are THE C++ ideas. Read Effective Modern C++ items 17, 23, 25, 41 (move semantics, perfect forwarding). Watch Klaus Iglberger talks.",
+    memory: "Read all of Effective Modern C++ chapter 4 (smart pointers). Implement your own unique_ptr from scratch — clarifies what the standard does for you. Then read libstdc++'s std::unique_ptr source.",
+    library: "All categories. The Library chapter IS the curriculum once you've grasped RAII and templates. Read each pattern, predict the output, type it yourself, run with sanitizers.",
+  },
+};
+
+const TROUBLESHOOT = {
+  start: {
+    q: "What broke?",
+    opts: [
+      { label: "🔴 Compile error — type mismatch, can't deduce, etc.", next: 'compile-err' },
+      { label: "🔴 Linker error — undefined reference, multiple definition", next: 'link-err' },
+      { label: "🔴 Template error — pages of cryptic substitution failures", next: 'template-err' },
+      { label: "🔴 Segfault / SIGSEGV", next: 'segfault' },
+      { label: "🔴 AddressSanitizer / valgrind reports a problem", next: 'asan' },
+      { label: "🐛 Object slicing — base methods called instead of derived", next: 'slice' },
+      { label: "🐛 Dangling reference / use-after-move", next: 'dangling' },
+      { label: "🐢 Code is too slow / build is too slow", next: 'slow-err' },
+    ],
+  },
+  'compile-err': {
+    fix: "Read the FIRST error. Later ones cascade. C++ errors are wordy — look for the actual source location.",
+    steps: [
+      "'cannot convert X to Y' → check types. C++ is strict; even similar types (int vs long) need explicit conversion sometimes.",
+      "'no matching function for call' → check argument types AND number. Lists all candidates. Match by signature.",
+      "'use of deleted function' → likely move/copy was deleted (rule of 5 issue). Define explicitly or = default.",
+      "'narrowing conversion' inside { } → braces forbid narrowing. Use cast or rethink the type.",
+      "'no viable constructor' → no constructor accepts that argument list. Add one or change the call.",
+      "Templates: read the constraint that failed (with concepts) or the line that 'requires' something.",
+    ],
+  },
+  'link-err': {
+    fix: "Symbol the linker can't find — usually a missing definition or wrong linkage.",
+    steps: [
+      "'undefined reference to FunctionName' → did you compile/link the .cpp that defines it? Forgot -lboost_system or -lfmt?",
+      "Template member function defined in .cpp instead of .h → templates need definitions visible. Move to header or use explicit instantiation.",
+      "'multiple definition of X' → non-template function defined in a header without inline. Mark inline or move to .cpp.",
+      "Inconsistent C++ standard versions across compilations? Build sometimes mixes old + new with ABI breaks.",
+      "Mixing libstdc++ and libc++? Different STL implementations are not link-compatible. Pick one.",
+      "Use `nm -C ./app | grep symbol` to see what's defined. `c++filt mangled_name` to read symbols.",
+    ],
+  },
+  'template-err': {
+    fix: "Templates produce notorious error walls. C++20 concepts make this much better.",
+    steps: [
+      "Look for 'required from here' lines — they show the chain. Earliest in the chain is usually closest to your code.",
+      "Substitution-failure errors? Pre-C++20 SFINAE — usually the constraint failed silently and the next overload was tried. Use concepts.",
+      "Switch to a concept: `template<std::integral T>` shows a single error ('does not satisfy std::integral') instead of pages.",
+      "Use static_assert<concept_v<T>> early in the template body to fail fast with a clear message.",
+      "Compile with -fconcepts-diagnostics-depth=N to limit recursion in error messages.",
+      "If pre-C++20, use enable_if_t with custom traits — write traits with clear names that show in errors.",
+    ],
+  },
+  'segfault': {
+    fix: "Dereferenced an invalid pointer/reference. Run with sanitizers — they'll point at the exact line.",
+    steps: [
+      "Recompile with -g -fsanitize=address,undefined. Run. ASAN's stack trace tells you both the bad access AND where the memory was freed/created.",
+      "Without sanitizers: gdb ./app; r; (on crash) bt; print variables.",
+      "Common: dereferencing nullptr (smart pointer or otherwise). Check return values of dynamic_cast (returns null on failure).",
+      "Common: iterator invalidation. vec.push_back() can invalidate iterators if it reallocates. Loop bookkeeping bugs.",
+      "Common: use after move. After std::move(x), x is valid but unspecified — don't use it.",
+      "Common: pure virtual call during construction/destruction. Virtual dispatch resolves to the under-construction class. Don't call virtual functions from ctors/dtors.",
+    ],
+  },
+  'asan': {
+    fix: "AddressSanitizer found something real. Trust it.",
+    steps: [
+      "'heap-use-after-free' → you accessed a pointer after the object was destroyed. Smart pointers help here; raw pointers from a function that owns the data don't.",
+      "'heap-buffer-overflow' → out of bounds. Vector iterators, manual indexing past size, strncpy/sprintf without bounds.",
+      "'stack-buffer-overflow' → local array overrun. Often C-string operations on too-small char buf[N].",
+      "'global-buffer-overflow' → static array overrun. Similar to stack.",
+      "'memory leak' (ASAN at exit) → some allocation never freed. unique_ptr/shared_ptr usually solves this; if you use raw new, find the missing delete path.",
+      "'detected memory leaks' AND it's a one-off init? --leak-check-at-exit=0 if intentional. Otherwise: fix.",
+    ],
+  },
+  'slice': {
+    fix: "Polymorphic object copied by VALUE into a base — derived fields and overrides are lost.",
+    steps: [
+      "Symptom: `void f(Base b) { b.virtual_method(); }` always calls Base's version even when you pass a Derived.",
+      "Fix: pass by reference or pointer for polymorphic use. `void f(Base& b)` — vtable lookup works.",
+      "Pass smart_ptr for ownership transfer of polymorphic objects.",
+      "Make Base abstract (pure virtual = 0) so it can't even be constructed standalone.",
+      "Or make the copy constructor protected/private/deleted on Base.",
+    ],
+  },
+  'dangling': {
+    fix: "Reference or pointer outlives the thing it refers to. Subtle — sometimes works in tests.",
+    steps: [
+      "'returning reference to local variable' (compiler warns) → don't return T& to a local. Return by value.",
+      "`const auto& x = vec[0]; vec.push_back(y);` → reallocation may invalidate x. Use indices or be careful.",
+      "Lambdas capturing by reference [&] outliving the captured scope → captured refs dangle. Use [=] for short-lived lambdas or audit lifetimes.",
+      "After std::move(x), x is valid-but-unspecified. Re-assign before reading.",
+      "string_view of a temporary string → temporary dies at end of statement; string_view dangles. Bind the source to a name.",
+      "AddressSanitizer + scan-build + clang-tidy's bugprone-use-after-move catch many of these.",
+    ],
+  },
+  'slow-err': {
+    fix: "Two C++ slownesses: runtime and compile-time. Different fixes.",
+    steps: [
+      "RUNTIME — profile first: perf record + perf report (Linux), Instruments (macOS), VTune. Find the hot 5%.",
+      "Hot-path allocations? Move them out of the loop. Use reserve() on vectors. Consider arena/pool allocators.",
+      "Cache misses? perf stat -e cache-misses. Restructure for sequential access. Consider SoA over AoS.",
+      "shared_ptr in inner loop? Atomic refcount kills perf. Pass by raw pointer or reference within scope.",
+      "Excess copies? -Wall -Wextra warns sometimes. clang-tidy's performance- checks catch them. Add std::move where appropriate.",
+      "COMPILE TIME — heavy headers? Move includes from .h to .cpp where possible. Use forward declarations. PIMPL.",
+      "Template instantiation explosion? Move templates' definitions to one .cpp with explicit instantiations.",
+      "Use ccache for incremental builds. Ninja generator instead of Make. Modules (C++20) when toolchain supports.",
+    ],
+  },
+};
+
+const ARCH_NODES = [
+  { id: 'src', x: 20, y: 18, w: 90, h: 32, label: '.cpp / .h', color: '#5eead4', desc: "Source + headers. C++ adds template definitions in headers (must be visible at instantiation). Modules (C++20) replace headers for new code." },
+  { id: 'pp', x: 20, y: 78, w: 90, h: 32, label: 'Preprocessor', color: '#5eead4', desc: "cpp / clang -E. Expands #include, #define, #ifdef. C++ TUs are LARGE after expansion — a #include <vector> pulls megabytes." },
+  { id: 'cc', x: 20, y: 138, w: 90, h: 32, label: 'Compiler', color: '#c084fc', desc: "Frontend: parse, type-check, template instantiate. Middle: optimize (LLVM IR or GIMPLE). Backend: target code generation. The bulk of compile time lives here for templated code." },
+  { id: 'as', x: 20, y: 198, w: 90, h: 32, label: 'Assembler', color: '#c084fc', desc: "Assembly → machine code → object file. Object contains compiled code + symbol table + relocations + debug info (DWARF/CodeView)." },
+  { id: 'ld', x: 170, y: 198, w: 90, h: 32, label: 'Linker', color: '#f87171', desc: "ld / lld / gold. Combines objects + libraries. Resolves cross-TU calls. Picks one definition for inline/template instantiations across TUs (ODR + COMDAT folding)." },
+  { id: 'exe', x: 170, y: 138, w: 90, h: 32, label: 'Executable', color: '#c084fc', desc: "ELF (Linux), Mach-O (macOS), PE/COFF (Windows). Contains code, data, dynamic loader info. Includes C++ runtime (libstdc++ or libc++) — usually dynamically linked." },
+  { id: 'lib', x: 170, y: 18, w: 90, h: 32, label: 'Libraries', color: '#5eead4', desc: "Standard library (libstdc++ / libc++), system libs, third-party (boost, fmt, abseil). Header-only vs compiled distinction matters for build times." },
+  { id: 'std', x: 170, y: 78, w: 90, h: 32, label: 'Std libs (ABI)', color: '#f87171', desc: "C++ standard library ABI is famously unstable. std::string layout differs between libstdc++ and libc++. Mixing C++ standard versions across libraries can silently break." },
+];
+
+const CHALLENGES = [
+  {
+    id: 'hello',
+    title: '01 · Hello, C++',
+    desc: "Print 'Hello, World!' using iostream.",
+    starter: `#include <iostream>
+
+int main() {
+    // your code
+    return 0;
+}
+`,
+    expected: 'Hello, World!\n',
+  },
+  {
+    id: 'vector_sum',
+    title: '02 · Vector sum',
+    desc: "Sum a std::vector with std::accumulate. Output: 15",
+    starter: `#include <iostream>
+#include <vector>
+#include <numeric>
+
+int main() {
+    std::vector<int> v = {1, 2, 3, 4, 5};
+    // compute sum with std::accumulate
+    int sum = 0;
+    // your code
+    std::cout << sum << std::endl;
+    return 0;
+}
+`,
+    expected: '15\n',
+  },
+  {
+    id: 'class_point',
+    title: '03 · Point class',
+    desc: "Define a Point class with x, y, and an add() method. Output: (4, 6)",
+    starter: `#include <iostream>
+
+// Define Point here
+
+int main() {
+    Point a(1, 2);
+    Point b(3, 4);
+    Point c = a.add(b);
+    std::cout << "(" << c.x << ", " << c.y << ")" << std::endl;
+    return 0;
+}
+`,
+    expected: '(4, 6)\n',
+  },
+  {
+    id: 'sort_strings',
+    title: '04 · Sort by length',
+    desc: "Sort strings by length using std::sort with a lambda. Output: a bb ccc dddd",
+    starter: `#include <iostream>
+#include <vector>
+#include <string>
+#include <algorithm>
+
+int main() {
+    std::vector<std::string> v = {"ccc", "a", "dddd", "bb"};
+    // sort by length using std::sort + lambda
+    // your code
+    for (size_t i = 0; i < v.size(); ++i) {
+        std::cout << v[i];
+        if (i + 1 < v.size()) std::cout << " ";
+    }
+    std::cout << std::endl;
+    return 0;
+}
+`,
+    expected: 'a bb ccc dddd\n',
+  },
+  {
+    id: 'reverse_string',
+    title: '05 · Reverse a string',
+    desc: "Use std::reverse to reverse a std::string. Output: dlrow olleh",
+    starter: `#include <iostream>
+#include <string>
+#include <algorithm>
+
+int main() {
+    std::string s = "hello world";
+    // reverse it
+    // your code
+    std::cout << s << std::endl;
+    return 0;
+}
+`,
+    expected: 'dlrow olleh\n',
+  },
+  {
+    id: 'count_evens',
+    title: '06 · Count evens with std::count_if',
+    desc: "Count even numbers using std::count_if with a lambda. Output: 4",
+    starter: `#include <iostream>
+#include <vector>
+#include <algorithm>
+
+int main() {
+    std::vector<int> v = {1, 2, 3, 4, 5, 6, 7, 8};
+    // count even numbers using count_if
+    int count = 0;
+    // your code
+    std::cout << count << std::endl;
+    return 0;
+}
+`,
+    expected: '4\n',
+  },
+];
+
+/* ─── Storage helpers ─── */
+const STORAGE_PREFIX = 'cppatlas:';
+async function loadKey(key) {
+  try {
+    const result = await window.storage.get(STORAGE_PREFIX + key);
+    if (result?.value) return JSON.parse(result.value);
+  } catch (e) {}
+  return null;
+}
+async function saveKey(key, value) {
+  try { await window.storage.set(STORAGE_PREFIX + key, JSON.stringify(value)); }
+  catch (e) {}
+}
+
+const LIBRARY = {
+  raii: {
+    label: 'RAII',
+    icon: '◯',
+    snippets: [
+      {
+        id: 'scope-guard',
+        title: 'Scope guard (manual cleanup any expression)',
+        desc: "When you have cleanup that's not naturally a destructor. Capture lambda, run on destruction. Useful for ad-hoc rollback paths.",
+        code: `#include <utility>
+
+template<typename F>
+class ScopeGuard {
+    F fn_;
+    bool active_ = true;
+public:
+    explicit ScopeGuard(F&& fn) : fn_(std::move(fn)) {}
+    ~ScopeGuard() { if (active_) fn_(); }
+    void dismiss() noexcept { active_ = false; }
+
+    ScopeGuard(const ScopeGuard&) = delete;
+    ScopeGuard& operator=(const ScopeGuard&) = delete;
+};
+
+template<typename F>
+auto make_scope_guard(F&& fn) { return ScopeGuard<F>(std::forward<F>(fn)); }
+
+// Usage:
+void migrate_db() {
+    backup_db();
+    auto rollback = make_scope_guard([] { restore_backup(); });
+
+    do_migration();          // if this throws, rollback fires
+
+    rollback.dismiss();      // success — don't rollback
+}`,
+        note: "Andrei Alexandrescu's pattern from 'Modern C++ Design.' Standardized as boost::scope_exit, proposed for std as std::scope_exit/scope_fail/scope_success (P0052). For now, write your own or use gsl::finally."
+      },
+      {
+        id: 'lock-guard',
+        title: 'Lock guards (mutex RAII)',
+        desc: "Never call mutex.lock()/unlock() manually. Lock guards make exception safety automatic.",
+        code: `#include <mutex>
+#include <shared_mutex>
+
+std::mutex m;
+std::shared_mutex rwm;
+
+// C++11: std::lock_guard — basic RAII lock
+void single_lock() {
+    std::lock_guard<std::mutex> guard(m);
+    // ... critical section
+}   // released automatically
+
+// C++17: std::scoped_lock — multiple mutexes, deadlock-safe
+void multi_lock(std::mutex& a, std::mutex& b) {
+    std::scoped_lock guard(a, b);   // acquires both via algorithm avoiding deadlock
+}
+
+// C++17: std::shared_lock for reader/writer
+void read_only() {
+    std::shared_lock lock(rwm);     // many readers OK
+    // ... read
+}
+
+void write() {
+    std::unique_lock lock(rwm);     // exclusive
+    // ... write
+}
+
+// C++11: unique_lock — when you need transfer ownership or condition variables
+void with_cv(std::condition_variable& cv) {
+    std::unique_lock lock(m);
+    cv.wait(lock, [] { return ready; });   // releases mutex while waiting
+}`,
+        note: "scoped_lock (C++17) is the modern default — works with 0, 1, or many mutexes; avoids deadlock when locking multiple. lock_guard for single-mutex simple cases. unique_lock when you need ownership transfer or condition_variable interaction."
+      },
+      {
+        id: 'unique-handle',
+        title: 'RAII wrapper for OS handles',
+        desc: "Wrap a non-pointer resource (file descriptor, OpenGL ID) in a move-only RAII type.",
+        code: `#include <utility>
+#include <unistd.h>   // POSIX close
+
+class FileDescriptor {
+    int fd_;
+public:
+    explicit FileDescriptor(int fd = -1) noexcept : fd_(fd) {}
+
+    ~FileDescriptor() { if (fd_ >= 0) ::close(fd_); }
+
+    // Move-only
+    FileDescriptor(FileDescriptor&& other) noexcept
+        : fd_(std::exchange(other.fd_, -1)) {}
+
+    FileDescriptor& operator=(FileDescriptor&& other) noexcept {
+        if (this != &other) {
+            if (fd_ >= 0) ::close(fd_);
+            fd_ = std::exchange(other.fd_, -1);
+        }
+        return *this;
+    }
+
+    FileDescriptor(const FileDescriptor&) = delete;
+    FileDescriptor& operator=(const FileDescriptor&) = delete;
+
+    int get() const noexcept { return fd_; }
+    int release() noexcept { return std::exchange(fd_, -1); }
+};`,
+        note: "std::exchange returns the old value while assigning the new — perfect for move operations. Sentinel value -1 means 'no resource.' Same pattern works for HANDLE (Windows), GLuint (OpenGL), SDL_Window*, sqlite3*, etc."
+      },
+      {
+        id: 'defer-syntax',
+        title: 'Go-style defer via macros',
+        desc: "Sometimes scope_guard is too noisy. A macro lets you write 'defer { cleanup(); };'.",
+        code: `#define CONCAT_IMPL(x, y) x##y
+#define CONCAT(x, y) CONCAT_IMPL(x, y)
+
+template<typename F>
+struct Deferrer {
+    F fn;
+    ~Deferrer() { fn(); }
+};
+
+template<typename F>
+Deferrer<F> make_deferrer(F&& f) { return {std::forward<F>(f)}; }
+
+#define defer auto CONCAT(_defer_, __LINE__) = make_deferrer
+
+// Usage:
+void example() {
+    FILE* f = fopen("data", "r");
+    defer([&] { if (f) fclose(f); });
+
+    do_work_that_might_throw();
+    // f gets closed regardless
+}`,
+        note: "Macros in C++ are a smell — but defer-syntax is a clear win in readability for ad-hoc cleanup. Use sparingly. unique_ptr with custom deleter is the more idiomatic answer for C-handle wrapping."
+      },
+    ],
+  },
+  smart_ptrs: {
+    label: 'Smart Pointers',
+    icon: '⌖',
+    snippets: [
+      {
+        id: 'make-unique',
+        title: 'make_unique / make_shared',
+        desc: "Always use the factory functions. They're exception-safe; make_shared also does a single allocation for object + control block.",
+        code: `#include <memory>
+
+// Sole ownership
+auto w = std::make_unique<Widget>(arg1, arg2);
+
+// Shared ownership — single allocation (object + control block together)
+auto s = std::make_shared<Widget>(arg1, arg2);
+
+// Transfer ownership
+std::unique_ptr<Widget> create_widget() {
+    return std::make_unique<Widget>();   // RVO-elided
+}
+
+// Take ownership in a function
+void consume(std::unique_ptr<Widget> w) {
+    // owns it; destroyed at scope exit
+}
+consume(std::move(my_widget));            // explicit transfer
+
+// Non-owning observer in a function — use raw pointer or reference
+void inspect(const Widget& w);            // doesn't extend lifetime
+inspect(*my_widget);
+
+// Or for nullable observer:
+void maybe_inspect(const Widget* w);
+maybe_inspect(my_widget.get());`,
+        note: "Never wrap an existing raw new in a smart pointer's constructor — make_unique/make_shared handle it. .get() returns a raw pointer WITHOUT transferring ownership — use only for non-owning observers."
+      },
+      {
+        id: 'custom-deleter',
+        title: 'unique_ptr with custom deleter',
+        desc: "Wrap any C resource that has a close/destroy function. The deleter is part of the unique_ptr's type.",
+        code: `#include <memory>
+#include <cstdio>
+
+// FILE* wrapper
+struct FileCloser { void operator()(FILE* f) const noexcept { if (f) fclose(f); } };
+using UniqueFile = std::unique_ptr<FILE, FileCloser>;
+
+UniqueFile open_file(const char* path) {
+    return UniqueFile(fopen(path, "r"));
+}
+
+// Usage
+auto f = open_file("data.txt");
+if (f) {
+    char buf[256];
+    fgets(buf, sizeof buf, f.get());
+}   // fclose called automatically
+
+// Lambda deleter (C++20 type deduction makes this nice)
+auto deleter = [](FILE* f) { if (f) fclose(f); };
+std::unique_ptr<FILE, decltype(deleter)> f2(fopen("d.txt", "r"));
+
+// For sqlite, OpenGL, etc.
+struct GLBufferDeleter { void operator()(GLuint id) const { glDeleteBuffers(1, &id); } };`,
+        note: "Stateless deleters (like FileCloser) add zero space — empty-base-optimization. Lambda deleters with captures add their size. Stateful deleters: use unique_ptr<T, std::function<void(T*)>> if you must (with allocation cost)."
+      },
+      {
+        id: 'shared-from-this',
+        title: 'enable_shared_from_this — get shared_ptr from inside a class',
+        desc: "When a member function needs to give a shared_ptr to itself (e.g., for async callbacks). Inherit from std::enable_shared_from_this<T>.",
+        code: `#include <memory>
+
+class Session : public std::enable_shared_from_this<Session> {
+public:
+    void start_async() {
+        // Need to keep self alive across the async boundary
+        auto self = shared_from_this();
+        async_op([self, this] {
+            this->finish();          // self keeps the Session alive
+        });
+    }
+    void finish() { /* ... */ }
+};
+
+// Usage — MUST construct via make_shared (or shared_ptr constructor)
+auto s = std::make_shared<Session>();
+s->start_async();
+
+// WARNING: calling shared_from_this() on an object NOT owned by a shared_ptr is UB.
+// Common bug: doing it in the constructor. The shared_ptr isn't established yet.`,
+        note: "Common in network servers (boost::asio sessions): the async callback must extend session lifetime. std::weak_from_this() (C++17) gets a weak_ptr if you need non-owning self-ref."
+      },
+      {
+        id: 'weak-cycle',
+        title: 'Break shared_ptr cycles with weak_ptr',
+        desc: "Parent owns children with shared_ptr; children reference parent with weak_ptr. Otherwise: leak.",
+        code: `#include <memory>
+#include <vector>
+
+class Node : public std::enable_shared_from_this<Node> {
+public:
+    void add_child(std::shared_ptr<Node> child) {
+        child->parent_ = weak_from_this();
+        children_.push_back(std::move(child));
+    }
+
+    std::shared_ptr<Node> parent() const {
+        return parent_.lock();   // converts to shared_ptr if parent still alive, else null
+    }
+
+private:
+    std::weak_ptr<Node> parent_;
+    std::vector<std::shared_ptr<Node>> children_;
+};
+
+// Without the weak_ptr, parent → child shared → parent shared = cycle = leak.
+// shared_ptr is REFERENCE COUNTED, not garbage collected. Cycles don't reach 0.`,
+        note: "Rule of thumb: 'down' relationships own (shared_ptr); 'up' relationships observe (weak_ptr). Trees and graphs follow this naturally."
+      },
+    ],
+  },
+  stl: {
+    label: 'STL Idioms',
+    icon: '▤',
+    snippets: [
+      {
+        id: 'erase-remove',
+        title: 'Erase-remove idiom (C++20 erase_if)',
+        desc: "Remove elements matching a predicate from a container. C++20 made this finally one-liner.",
+        code: `#include <vector>
+#include <algorithm>
+
+std::vector<int> v = {1, 2, 3, 4, 5, 6};
+
+// C++20 — std::erase_if (free function)
+std::erase_if(v, [](int x) { return x % 2 == 0; });
+// v == {1, 3, 5}
+
+// Pre-C++20 (the classic 'erase-remove' idiom)
+v.erase(std::remove_if(v.begin(), v.end(),
+        [](int x) { return x % 2 == 0; }),
+        v.end());
+// std::remove_if shifts unwanted-to-end and returns new logical end;
+// .erase() then trims. Two-step weirdness that erase_if hides.
+
+// std::erase (no predicate) for value-based removal
+std::erase(v, 3);             // C++20`,
+        note: "Pre-C++20 erase-remove was THE idiom every C++ dev had to know. Now: std::erase_if(container, pred) or std::erase(container, value). Works for vector, deque, list, string, etc."
+      },
+      {
+        id: 'sort-unique',
+        title: 'sort + unique to deduplicate',
+        desc: "Remove duplicates in O(n log n). std::unique only removes CONSECUTIVE duplicates — sort first.",
+        code: `#include <vector>
+#include <algorithm>
+
+std::vector<int> v = {3, 1, 4, 1, 5, 9, 2, 6, 5, 3};
+
+std::ranges::sort(v);                          // {1,1,2,3,3,4,5,5,6,9}
+auto last = std::ranges::unique(v).begin();    // returns subrange of first dup
+v.erase(last, v.end());                        // trim
+// v == {1, 2, 3, 4, 5, 6, 9}
+
+// C++20 one-liner using ranges:
+auto sorted_unique = std::vector(v.begin(), v.end());
+std::ranges::sort(sorted_unique);
+auto [first, _] = std::ranges::unique(sorted_unique);
+sorted_unique.erase(first, sorted_unique.end());`,
+        note: "If you don't want to mutate the original or care about order, copy to a std::set or std::unordered_set instead. set: O(n log n), unordered_set: O(n) avg. Don't use the sort+unique trick on tiny vectors where set is plenty fast."
+      },
+      {
+        id: 'transform-accumulate',
+        title: 'transform + accumulate (map + fold)',
+        desc: "Functional-style data processing. Convert with transform, reduce with accumulate or reduce.",
+        code: `#include <vector>
+#include <numeric>
+#include <algorithm>
+
+std::vector<int> v = {1, 2, 3, 4, 5};
+
+// Sum
+int sum = std::accumulate(v.begin(), v.end(), 0);                 // 15
+
+// Sum of squares
+int ss = std::accumulate(v.begin(), v.end(), 0,
+    [](int a, int x) { return a + x*x; });                        // 55
+
+// Transform in place
+std::ranges::transform(v, v.begin(), [](int x) { return x * 2; }); // double in place
+
+// Transform into new container
+std::vector<std::string> labels;
+labels.reserve(v.size());
+std::ranges::transform(v, std::back_inserter(labels),
+    [](int x) { return "n=" + std::to_string(x); });
+
+// C++17: std::reduce — like accumulate but parallelizable + order-independent
+#include <execution>
+int parallel_sum = std::reduce(std::execution::par, v.begin(), v.end());`,
+        note: "C++17 added execution policies: par, par_unseq, seq, unseq — parallelize most algorithms. par_unseq additionally allows SIMD vectorization. Free speedup if your compiler + stdlib support them (libstdc++ needs Intel TBB)."
+      },
+      {
+        id: 'sorted-map',
+        title: 'std::map vs std::unordered_map vs std::flat_map (C++23)',
+        desc: "Three associative containers. Pick the right one.",
+        code: `#include <map>
+#include <unordered_map>
+#include <flat_map>    // C++23
+
+// std::map — red-black tree. Sorted iteration. O(log n) ops. Use when you need order.
+std::map<std::string, int> counts;
+counts["alice"] = 1;
+for (auto& [name, n] : counts) { /* iterates in sorted order */ }
+
+// std::unordered_map — hash table. O(1) avg. Faster lookup; no order. Use for sets/maps without ordering need.
+std::unordered_map<std::string, int> cache;
+cache.reserve(1000);          // avoid rehashes
+auto it = cache.find(key);
+if (it != cache.end()) { use(it->second); }
+
+// std::flat_map (C++23) — sorted vector under the hood. Same interface as map.
+// Better cache locality, slower insert (O(n) shift), faster lookup, way less memory.
+// Use when: lots of lookups, few inserts after build, want sorted iteration.
+std::flat_map<std::string, int> lookup;`,
+        note: "Default to unordered_map when you need a hash table. std::map's tree structure has poor cache locality (separate nodes). flat_map (C++23) is what you want when lookup-heavy on a mostly-immutable mapping. abseil's flat_hash_map is the third-party version popular pre-C++23."
+      },
+      {
+        id: 'string-view',
+        title: 'std::string_view for non-owning string params',
+        desc: "Pass strings to functions without copying. Works with std::string, char*, string literals.",
+        code: `#include <string_view>
+#include <string>
+
+// Accepts everything: literal, std::string, char* — no copies
+bool has_prefix(std::string_view s, std::string_view prefix) {
+    return s.size() >= prefix.size() &&
+           s.substr(0, prefix.size()) == prefix;
+}
+
+has_prefix("hello world", "hello");           // ok
+std::string s = "hello world";
+has_prefix(s, "hello");                       // no copy of s
+has_prefix(c_string_ptr, "hello");
+
+// WARNING: string_view doesn't own. Don't return one to a temporary:
+std::string_view bad() {
+    std::string local = "hi";
+    return local;       // local dies; returned view dangles
+}`,
+        note: "string_view (C++17) is the answer to 'how do I take a string parameter efficiently.' Replaces (const std::string&) AND (const char*) overloads with one. But: lifetime is YOUR responsibility — the view doesn't keep its source alive."
+      },
+    ],
+  },
+  templates: {
+    label: 'Templates',
+    icon: '⟨⟩',
+    snippets: [
+      {
+        id: 'concept-basic',
+        title: 'Concept definition + use (C++20)',
+        desc: "Constrain a template parameter cleanly. Better than SFINAE in every way.",
+        code: `#include <concepts>
+#include <type_traits>
+
+// Custom concept
+template<typename T>
+concept Addable = requires(T a, T b) {
+    { a + b } -> std::convertible_to<T>;
+};
+
+// Usage 1: declared template parameter
+template<Addable T>
+T sum(T a, T b) { return a + b; }
+
+// Usage 2: requires clause
+template<typename T>
+    requires Addable<T>
+T sum(T a, T b) { return a + b; }
+
+// Usage 3: abbreviated function syntax (cleanest)
+auto sum(Addable auto a, Addable auto b) { return a + b; }
+
+// Combine concepts
+template<typename T>
+concept Numeric = std::integral<T> || std::floating_point<T>;
+
+// Library predefined ones in <concepts>:
+//   std::integral, std::floating_point, std::same_as, std::derived_from,
+//   std::convertible_to, std::equality_comparable, std::totally_ordered,
+//   std::movable, std::copyable, std::regular, std::invocable<F, Args...>`,
+        note: "Concepts are THE C++20 feature for everyday code. SFINAE errors were the worst part of pre-C++20 templates. Now constraint failures produce a single readable error pointing at the failed concept."
+      },
+      {
+        id: 'crtp',
+        title: 'CRTP — compile-time polymorphism',
+        desc: "Static dispatch via a derived-class template parameter. Zero runtime cost vs virtual.",
+        code: `template<typename Derived>
+class Shape {
+public:
+    double area() const {
+        return static_cast<const Derived*>(this)->area_impl();
+    }
+    double perimeter() const {
+        return static_cast<const Derived*>(this)->perimeter_impl();
+    }
+};
+
+class Circle : public Shape<Circle> {
+    double r_;
+public:
+    explicit Circle(double r) : r_(r) {}
+    double area_impl() const { return 3.14159 * r_ * r_; }
+    double perimeter_impl() const { return 2 * 3.14159 * r_; }
+};
+
+class Square : public Shape<Square> {
+    double s_;
+public:
+    explicit Square(double s) : s_(s) {}
+    double area_impl() const { return s_ * s_; }
+    double perimeter_impl() const { return 4 * s_; }
+};
+
+// Polymorphic — but resolved at compile time, no vtable lookup
+template<typename S>
+void print_info(const Shape<S>& s) {
+    std::cout << s.area() << " " << s.perimeter() << "\\n";
+}`,
+        note: "Used in std::enable_shared_from_this, Eigen expression templates, range-v3 base classes. Downside: no heterogeneous containers (each Shape<X> is a different type). Use virtual when you need a runtime mix of types."
+      },
+      {
+        id: 'variadic',
+        title: 'Variadic templates',
+        desc: "Functions/classes that take any number of type arguments. Foundation of std::tuple, std::variant, factory functions.",
+        code: `#include <iostream>
+#include <utility>
+
+// Recursive variadic — old style
+template<typename T>
+void print(const T& x) { std::cout << x; }
+
+template<typename T, typename... Rest>
+void print(const T& x, const Rest&... rest) {
+    std::cout << x << " ";
+    print(rest...);
+}
+
+// C++17 fold expressions — much cleaner
+template<typename... Args>
+void print17(const Args&... args) {
+    ((std::cout << args << " "), ...);   // fold over comma operator
+    std::cout << "\\n";
+}
+
+// Perfect-forwarding factory (the make_unique / make_shared pattern)
+template<typename T, typename... Args>
+T* make(Args&&... args) {
+    return new T(std::forward<Args>(args)...);
+}
+
+// Usage
+print17(1, "hello", 3.14, 'x');
+auto* p = make<Widget>(42, "title", true);`,
+        note: "Fold expressions (C++17) collapse '(expr op ...)' or '(... op expr)' over the pack. std::forward preserves value category (lvalue stays lvalue, rvalue stays rvalue) — required for perfect forwarding."
+      },
+      {
+        id: 'tag-dispatch',
+        title: 'Tag dispatch — compile-time switching',
+        desc: "Select an implementation based on a compile-time tag (often a type trait). The classic pre-concept dispatch idiom.",
+        code: `#include <iterator>
+
+// Implementations specialized on iterator category
+template<typename It>
+auto distance_impl(It a, It b, std::random_access_iterator_tag) {
+    return b - a;                       // O(1)
+}
+
+template<typename It>
+auto distance_impl(It a, It b, std::input_iterator_tag) {
+    typename std::iterator_traits<It>::difference_type n = 0;
+    while (a != b) { ++a; ++n; }        // O(n)
+    return n;
+}
+
+// Public — picks the right impl by iterator category
+template<typename It>
+auto my_distance(It a, It b) {
+    using cat = typename std::iterator_traits<It>::iterator_category;
+    return distance_impl(a, b, cat{});
+}
+
+// In C++17+ this is often if constexpr — same idea, less ceremony
+template<typename It>
+auto my_distance17(It a, It b) {
+    using cat = typename std::iterator_traits<It>::iterator_category;
+    if constexpr (std::is_base_of_v<std::random_access_iterator_tag, cat>) {
+        return b - a;
+    } else {
+        decltype(b - a) n = 0;
+        while (a != b) { ++a; ++n; }
+        return n;
+    }
+}`,
+        note: "Tag dispatch was THE way pre-C++17. if constexpr (C++17) and concepts (C++20) replace it for new code. But you'll see tag dispatch all over libstdc++/libc++ source — recognize it."
+      },
+    ],
+  },
+  ranges: {
+    label: 'Concepts & Ranges',
+    icon: '⤳',
+    snippets: [
+      {
+        id: 'range-pipeline',
+        title: 'Pipe operator + views (C++20)',
+        desc: "Lazy, composable range transformations. No allocation, no eager computation.",
+        code: `#include <ranges>
+#include <vector>
+#include <iostream>
+
+std::vector<int> v = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+
+// Pipeline: filter evens, square them, take first 3, print
+auto pipeline = v
+    | std::views::filter([](int x) { return x % 2 == 0; })
+    | std::views::transform([](int x) { return x * x; })
+    | std::views::take(3);
+
+for (int x : pipeline) std::cout << x << " ";   // 4 16 36
+
+// Materialize into a vector (C++23)
+auto squares = v
+    | std::views::filter([](int x) { return x % 2 == 0; })
+    | std::views::transform([](int x) { return x * x; })
+    | std::ranges::to<std::vector>();         // C++23
+
+// Common views (C++20)
+//   views::all          — entire range
+//   views::filter(pred) — keep matching
+//   views::transform(f) — apply f
+//   views::take(n)      — first n
+//   views::drop(n)      — skip first n
+//   views::reverse      — reversed
+//   views::iota(a)      — a, a+1, a+2, ...  (infinite if no end)
+//   views::iota(a, b)   — a, a+1, ..., b-1
+//   views::join         — flatten range of ranges
+//   views::split(delim) — split a range by delimiter
+//
+// C++23 adds: views::zip, views::enumerate, views::chunk, views::slide,
+//             views::adjacent, views::cartesian_product, views::join_with`,
+        note: "Views are LAZY — nothing happens until iterated. Composable: chain as many as you like. Memory cost is zero (each view is a thin wrapper). std::ranges::to<Container>() materializes into a real container."
+      },
+      {
+        id: 'range-algos',
+        title: 'Ranges algorithms (no .begin()/.end() noise)',
+        desc: "Every std::algorithm has a std::ranges:: version that takes a range directly.",
+        code: `#include <ranges>
+#include <algorithm>
+#include <vector>
+
+std::vector<int> v = {3, 1, 4, 1, 5, 9, 2, 6};
+
+// Old way — pre-C++20
+std::sort(v.begin(), v.end());
+auto it = std::find(v.begin(), v.end(), 5);
+std::for_each(v.begin(), v.end(), [](int x) { /* ... */ });
+
+// C++20 ranges — cleaner
+std::ranges::sort(v);
+auto it2 = std::ranges::find(v, 5);
+std::ranges::for_each(v, [](int x) { /* ... */ });
+
+// Projections — apply a function before comparing (C++20)
+struct Person { std::string name; int age; };
+std::vector<Person> people = /* ... */;
+
+// Sort by age — projection extracts the field
+std::ranges::sort(people, {}, &Person::age);
+
+// Sort by name length — projection is any callable
+std::ranges::sort(people, {}, [](const Person& p) { return p.name.size(); });
+
+// Custom comparator + projection
+std::ranges::sort(people, std::greater{}, &Person::age);   // descending age`,
+        note: "Projections are a killer feature. Pass {} for default comparator. The projection is applied to each element BEFORE comparison. Eliminates most lambdas you'd write for sort/find/min_element by a field."
+      },
+      {
+        id: 'custom-range',
+        title: 'Writing a range — generator-like patterns',
+        desc: "A custom range type is just begin() + end() + an iterator. C++23 makes generators first-class.",
+        code: `#include <ranges>
+#include <iostream>
+
+// C++23 — std::generator (coroutine-based)
+#include <generator>
+
+std::generator<int> fibonacci() {
+    int a = 0, b = 1;
+    while (true) {
+        co_yield a;
+        int next = a + b;
+        a = b;
+        b = next;
+    }
+}
+
+// Usage: first 10 Fibonacci numbers
+for (int n : fibonacci() | std::views::take(10)) {
+    std::cout << n << " ";
+}
+// 0 1 1 2 3 5 8 13 21 34
+
+// Pre-C++23: roll your own iterator. Much more boilerplate.
+// Pre-C++20: extra boilerplate with iterator_traits, etc.`,
+        note: "std::generator (C++23) is the killer use-case for coroutines — write generator-style code with co_yield. Composes with ranges views. Heap-allocates per generator instance (each coroutine frame); fine for most uses, not for innermost hot loops."
+      },
+    ],
+  },
+  async: {
+    label: 'Async',
+    icon: '⇄',
+    snippets: [
+      {
+        id: 'async-future',
+        title: 'std::async + std::future',
+        desc: "Simplest task-based concurrency. Launches a function in a separate thread (or deferred), returns a future for the result.",
+        code: `#include <future>
+#include <iostream>
+
+int slow_calculation(int input) {
+    // ... CPU-bound work
+    return input * 2;
+}
+
+int main() {
+    // Launch async
+    auto f = std::async(std::launch::async, slow_calculation, 21);
+
+    // Do other work...
+
+    int result = f.get();     // blocks until done
+    std::cout << result << "\\n";   // 42
+
+    // Multiple in parallel
+    std::vector<std::future<int>> futures;
+    for (int i = 0; i < 4; ++i) {
+        futures.push_back(std::async(std::launch::async, slow_calculation, i));
+    }
+    for (auto& fut : futures) {
+        std::cout << fut.get() << " ";
+    }
+}`,
+        note: "std::launch::async forces a thread; std::launch::deferred runs lazily on .get(). Without an explicit policy the implementation chooses, which can surprise you. For thread pools or real async, use std::execution (C++26) or a third-party library."
+      },
+      {
+        id: 'parallel-stl',
+        title: 'Parallel STL (C++17)',
+        desc: "Pass an execution policy to most std algorithms. Free parallelism if your library supports it.",
+        code: `#include <execution>
+#include <algorithm>
+#include <vector>
+#include <numeric>
+
+std::vector<double> v(10'000'000);
+// ... fill with data
+
+// Sequential (default)
+std::sort(v.begin(), v.end());
+
+// Parallel — multi-threaded
+std::sort(std::execution::par, v.begin(), v.end());
+
+// Parallel + unsequenced — also SIMD-vectorized
+std::sort(std::execution::par_unseq, v.begin(), v.end());
+
+// Reduce (associative; order-independent)
+double sum = std::reduce(std::execution::par, v.begin(), v.end(), 0.0);
+
+// Transform + reduce in one pass (map + fold)
+double sum_squares = std::transform_reduce(
+    std::execution::par, v.begin(), v.end(), 0.0,
+    std::plus<>{},
+    [](double x) { return x * x; }
+);`,
+        note: "libstdc++ requires Intel TBB at link time (libtbb). libc++ implementation in progress. MSVC has it natively. Speedup depends on data size and operation cost — small loops can be SLOWER due to overhead."
+      },
+      {
+        id: 'senders-preview',
+        title: 'std::execution senders/receivers (C++26 — preview)',
+        desc: "Composable async pipeline. Senders are deferred units of work. Schedulers say WHERE to run them. C++26's biggest async upgrade.",
+        code: `// C++26 — minimal flavor (syntax may shift; compile with GCC 14+ or Clang -std=c++2c)
+#include <execution>
+#include <iostream>
+#include <thread>
+
+namespace ex = std::execution;
+
+int main() {
+    // A scheduler — where work runs
+    auto pool = ex::system_context().get_scheduler();   // hypothetical
+    auto sched = pool;
+
+    // Build a sender pipeline (nothing runs yet)
+    auto work = ex::schedule(sched)
+              | ex::then([] { return 21; })
+              | ex::then([](int x) { return x * 2; })
+              | ex::then([](int x) { std::cout << x << "\\n"; });
+
+    // Start it; block on result
+    ex::sync_wait(work);   // prints 42
+}`,
+        note: "C++26 was finalized March 2026. std::execution (P2300) gives structured concurrency: composable senders, three result channels (value/error/stopped), customizable scheduling. Wraps coroutines naturally. Best treatment: Lucian Radu Teodorescu's ACCU article. Library implementations: NVIDIA stdexec, Facebook libunifex."
+      },
+    ],
+  },
+  memory: {
+    label: 'Memory',
+    icon: '◧',
+    snippets: [
+      {
+        id: 'placement-new',
+        title: 'Placement new — construct in pre-allocated memory',
+        desc: "Separate allocation from construction. Foundation of allocators, object pools, std::optional.",
+        code: `#include <new>            // for placement new
+#include <memory>
+
+// Raw storage — properly aligned
+alignas(Widget) char storage[sizeof(Widget)];
+
+// Construct in place
+Widget* w = new (storage) Widget(args);
+
+// Use
+w->method();
+
+// Destroy manually — placement new doesn't pair with delete
+w->~Widget();
+
+// std::construct_at (C++20) — preferred over placement new
+Widget* w2 = std::construct_at(reinterpret_cast<Widget*>(storage), args);
+std::destroy_at(w2);
+
+// Object pool using placement new
+template<typename T, size_t N>
+class Pool {
+    alignas(T) std::byte storage_[N * sizeof(T)];
+    std::vector<T*> free_;
+public:
+    Pool() {
+        for (size_t i = 0; i < N; ++i) {
+            free_.push_back(reinterpret_cast<T*>(storage_ + i * sizeof(T)));
+        }
+    }
+    template<typename... Args>
+    T* allocate(Args&&... args) {
+        if (free_.empty()) return nullptr;
+        T* p = free_.back();
+        free_.pop_back();
+        return std::construct_at(p, std::forward<Args>(args)...);
+    }
+    void release(T* p) {
+        std::destroy_at(p);
+        free_.push_back(p);
+    }
+};`,
+        note: "Real custom allocators use std::pmr (polymorphic memory resources, C++17). std::pmr::monotonic_buffer_resource is a standard arena. std::pmr::unsynchronized_pool_resource is a standard pool. Switch your container's allocator with std::pmr::vector<T> instead of std::vector<T>."
+      },
+      {
+        id: 'pmr',
+        title: 'std::pmr — polymorphic memory resources (C++17)',
+        desc: "Standard arena + pool allocators. Containers use them via std::pmr::vector etc. Runtime-pluggable allocation strategies.",
+        code: `#include <memory_resource>
+#include <vector>
+#include <array>
+
+// Stack-backed arena — zero heap allocation
+std::array<std::byte, 1024> buf;
+std::pmr::monotonic_buffer_resource arena(buf.data(), buf.size());
+
+std::pmr::vector<int> v(&arena);   // uses arena, not heap
+v.reserve(100);
+for (int i = 0; i < 100; ++i) v.push_back(i);
+// All allocations go into buf. Free when arena dies — no per-item free.
+
+// Pool resource — fixed-block allocator
+std::pmr::unsynchronized_pool_resource pool;
+std::pmr::list<int> list_(&pool);   // each node allocated from pool
+
+// Chain resources — fall back to heap when arena exhausts
+std::pmr::monotonic_buffer_resource fallback(&arena, std::pmr::new_delete_resource());`,
+        note: "pmr containers are a separate type from std:: containers — std::pmr::vector<int> ≠ std::vector<int>. The allocator is runtime-pluggable, paid for by a virtual call per allocation. Worth it: switch arena/pool/default without recompiling generic code."
+      },
+      {
+        id: 'sso',
+        title: 'Small String Optimization (SSO) explainer',
+        desc: "std::string optimizes short strings by storing them inline — no heap alloc until you exceed a threshold (~15-22 chars depending on stdlib).",
+        code: `#include <string>
+
+std::string s = "hello";          // typically: stored inline, no heap allocation
+std::cout << sizeof(s);            // ~24-32 bytes (the inline buffer)
+
+std::string big = std::string(100, 'a');   // overflowed inline → heap allocated
+
+// libstdc++: SSO ~15 chars
+// libc++: SSO ~22 chars (more aggressive — 3-word layout)
+// MSVC STL: ~15 chars
+
+// Equivalent optimization for small_vector — not standard, but in folly, abseil, EASTL`,
+        note: "SSO is invisible most of the time but matters for benchmarking (move semantics on SSO strings can be more expensive than copy — there's no heap pointer to swap). It's why std::string is bigger than you might expect for an 'empty' string."
+      },
+    ],
+  },
+  build: {
+    label: 'Build',
+    icon: '⚒',
+    snippets: [
+      {
+        id: 'cmake-modern',
+        title: 'Modern CMake — minimal good template',
+        desc: "Target-based, not variable-based. The modern CMake style (post-3.x) is dramatically cleaner than what older tutorials show.",
+        code: `cmake_minimum_required(VERSION 3.25)
+project(myapp LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)    # for clangd, IDEs
+
+add_library(myapp_lib
+    src/widget.cpp
+    src/session.cpp
+)
+
+target_include_directories(myapp_lib
+    PUBLIC include
+    PRIVATE src
+)
+
+target_compile_features(myapp_lib PUBLIC cxx_std_23)
+
+target_compile_options(myapp_lib PRIVATE
+    -Wall -Wextra -Wpedantic -Werror
+    $<$<CONFIG:Debug>:-g -fsanitize=address,undefined -fno-omit-frame-pointer>
+    $<$<CONFIG:Release>:-O3 -DNDEBUG>
+)
+
+target_link_options(myapp_lib PRIVATE
+    $<$<CONFIG:Debug>:-fsanitize=address,undefined>
+)
+
+add_executable(myapp src/main.cpp)
+target_link_libraries(myapp PRIVATE myapp_lib)
+
+# Build:
+#   cmake -B build -DCMAKE_BUILD_TYPE=Debug -G Ninja
+#   cmake --build build`,
+        note: "Modern CMake: think in TARGETS, not VARIABLES. target_include_directories, target_compile_options, target_link_libraries. PUBLIC vs PRIVATE vs INTERFACE control propagation to dependents. Avoid the 1990s-style `include_directories()`, `add_definitions()`, etc."
+      },
+      {
+        id: 'cmake-fetchcontent',
+        title: 'CMake FetchContent — declare deps inline',
+        desc: "No package manager required for many libs — CMake can fetch from git directly. Modern simple deps story.",
+        code: `include(FetchContent)
+
+FetchContent_Declare(fmt
+    GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+    GIT_TAG 10.2.1
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(fmt)
+
+FetchContent_Declare(googletest
+    GIT_REPOSITORY https://github.com/google/googletest.git
+    GIT_TAG v1.14.0
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(googletest)
+
+target_link_libraries(myapp PRIVATE fmt::fmt)
+target_link_libraries(tests PRIVATE GTest::gtest_main)`,
+        note: "Pins versions in CMakeLists.txt — reproducible. Slower first build (clones repos); cached afterward. For larger projects, prefer vcpkg or Conan (proper binary caches). For small projects or examples, FetchContent is dead simple."
+      },
+      {
+        id: 'vcpkg',
+        title: 'vcpkg — modern package management',
+        desc: "Microsoft-backed, integrates with CMake, large catalog. The closest C++ has to npm/cargo.",
+        code: `# Install vcpkg (one-time)
+git clone https://github.com/microsoft/vcpkg
+cd vcpkg && ./bootstrap-vcpkg.sh
+
+# Manifest mode (preferred): vcpkg.json in your project root
+{
+  "name": "myapp",
+  "version": "1.0.0",
+  "dependencies": [
+    "fmt",
+    "spdlog",
+    "boost-asio",
+    {
+      "name": "abseil",
+      "features": ["cxx17"]
+    }
+  ]
+}
+
+# Build with vcpkg toolchain
+cmake -B build \\
+    -DCMAKE_TOOLCHAIN_FILE=/path/to/vcpkg/scripts/buildsystems/vcpkg.cmake
+cmake --build build`,
+        note: "vcpkg in manifest mode commits the version manifest with your code — reproducible builds. Catalog has 2000+ libraries. Alternatives: Conan (mature, supported by JFrog), build2 (build system AND package manager), the artist-formerly-known-as Hunter. vcpkg has the most momentum in 2026."
+      },
+      {
+        id: 'single-header',
+        title: 'Header-only library pattern',
+        desc: "Distribute as a single .hpp. Easy to drop into any project. The format of nlohmann/json, doctest, fmt's compile.h header.",
+        code: `// myutil.hpp — single header, no .cpp file needed by users
+#pragma once
+#include <string>
+
+namespace myutil {
+
+// Inline ensures linker picks one definition even if header is included
+// in multiple TUs.
+inline std::string greet(std::string_view name) {
+    return "hello, " + std::string(name);
+}
+
+// Templates are implicitly inline-linkage; no inline keyword needed
+template<typename T>
+T add(T a, T b) { return a + b; }
+
+// Class member function definitions inside the class body are also implicitly inline
+class Logger {
+public:
+    void log(std::string_view msg) {
+        // ... defined in-class → inline
+    }
+};
+
+}  // namespace myutil`,
+        note: "Header-only trades compile time (everything reparsed in every TU) for zero-build-step integration. For larger libraries: provide both modes (define DETAIL_HEADER_ONLY) or just compile separately. C++20 modules will eventually replace this style entirely — but in 2026 module support is still maturing."
+      },
+    ],
+  },
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   MAIN COMPONENT
+   ═══════════════════════════════════════════════════════════════ */
+
+export default function CppAtlas() {
+  const [loaded, setLoaded] = useState(false);
+  const [completed, setCompleted] = useState(new Set());
+  const [checklist, setChecklist] = useState({});
+  const [quizState, setQuizState] = useState({});
+  const [stack, setStack] = useState(null);
+  const [activeSection, setActiveSection] = useState(0);
+
+  const [copied, setCopied] = useState(null);
+  const [termPopup, setTermPopup] = useState(null);
+  const [cmdOpen, setCmdOpen] = useState(false);
+  const [archSelected, setArchSelected] = useState(null);
+  const [timelineSelected, setTimelineSelected] = useState(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  useEffect(() => {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700&display=swap';
+    document.head.appendChild(link);
+    (async () => {
+      const [c, cl, qs, st, as] = await Promise.all([
+        loadKey('completed'), loadKey('checklist'), loadKey('quizState'),
+        loadKey('stack'), loadKey('activeSection'),
+      ]);
+      if (c) setCompleted(new Set(c));
+      if (cl) setChecklist(cl);
+      if (qs) setQuizState(qs);
+      if (st) setStack(st);
+      if (typeof as === 'number') setActiveSection(as);
+      if (!st) setShowOnboarding(true);
+      setLoaded(true);
+    })();
+    return () => { try { document.head.removeChild(link); } catch (e) {} };
+  }, []);
+
+  useEffect(() => { if (loaded) saveKey('completed', [...completed]); }, [completed, loaded]);
+  useEffect(() => { if (loaded) saveKey('checklist', checklist); }, [checklist, loaded]);
+  useEffect(() => { if (loaded) saveKey('quizState', quizState); }, [quizState, loaded]);
+  useEffect(() => { if (loaded && stack) saveKey('stack', stack); }, [stack, loaded]);
+  useEffect(() => { if (loaded) saveKey('activeSection', activeSection); }, [activeSection, loaded]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); setCmdOpen(o => !o); }
+      if (e.key === 'Escape') { setCmdOpen(false); setTermPopup(null); setArchSelected(null); setTimelineSelected(null); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  const copy = (text, id) => {
+    navigator.clipboard.writeText(text);
+    setCopied(id);
+    setTimeout(() => setCopied(null), 1800);
+  };
+  const toggleCheck = (id) => setChecklist(prev => ({ ...prev, [id]: !prev[id] }));
+  const markComplete = (i) => setCompleted(prev => new Set([...prev, i]));
+  const answerQuiz = (qid, choice, correct) => {
+    setQuizState(prev => ({ ...prev, [qid]: { choice, correct: choice === correct } }));
+  };
+
+  /* Godbolt link builder — encodes code for Compiler Explorer */
+  const godboltLink = (code) => {
+    const compiler = 'g142'; // gcc 14.2
+    const clientstate = {
+      sessions: [{
+        id: 1, language: 'c++', source: code,
+        compilers: [{ id: compiler, options: '-std=c++23 -O2 -Wall -Wextra' }]
+      }]
+    };
+    const encoded = encodeURIComponent(JSON.stringify(clientstate));
+    return `https://godbolt.org/clientstate/${btoa(unescape(encoded))}`;
+  };
+
+  /* ─── UI primitives ─── */
+  const Code = ({ children, id, lang = 'cpp', godbolt = true }) => {
+    const isRunnable = lang === 'cpp' && godbolt && typeof children === 'string';
+    return (
+      <div className="my-3 relative">
+        <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-zinc-500 px-3 py-1.5 border-b border-zinc-800 bg-zinc-950/80 gap-2">
+          <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>{lang}</span>
+          <div className="flex items-center gap-3">
+            {isRunnable && (
+              <a href={godboltLink(children)} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1 hover:text-teal-300 transition-colors">
+                <ExternalLink size={11} /> godbolt
+              </a>
+            )}
+            <button onClick={() => copy(children, id)} className="flex items-center gap-1.5 hover:text-purple-300 transition-colors">
+              {copied === id ? <Check size={12} /> : <Copy size={12} />}
+              {copied === id ? 'copied' : 'copy'}
+            </button>
+          </div>
+        </div>
+        <pre className="bg-zinc-950 border border-zinc-800 border-t-0 text-zinc-100 px-3 py-3 text-[13px] overflow-x-auto leading-relaxed" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+          <code>{children}</code>
+        </pre>
+      </div>
+    );
+  };
+
+  const Callout = ({ kind = 'info', children, title }) => {
+    const p = {
+      info: { border: 'border-purple-400/40', bg: 'bg-purple-400/5', text: 'text-purple-300', label: 'NOTE' },
+      warn: { border: 'border-red-400/50', bg: 'bg-red-400/5', text: 'text-red-300', label: 'UNDEFINED BEHAVIOR' },
+      tip: { border: 'border-teal-300/40', bg: 'bg-teal-300/5', text: 'text-teal-200', label: 'TIP' },
+      you: { border: 'border-amber-300/40', bg: 'bg-amber-300/5', text: 'text-amber-200', label: 'FOR YOUR STACK' },
+      cite: { border: 'border-zinc-700', bg: 'bg-zinc-900/40', text: 'text-zinc-400', label: 'CITATION' },
+      dont: { border: 'border-red-500/60', bg: 'bg-red-500/10', text: 'text-red-300', label: 'DO NOT USE' },
+    }[kind];
+    return (
+      <div className={`my-4 border ${p.border} ${p.bg} px-4 py-3`}>
+        <div className={`text-[10px] uppercase tracking-[0.25em] ${p.text} mb-1.5 flex items-center gap-1.5`} style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+          {kind === 'cite' && <Quote size={10} />}
+          {kind === 'warn' && <AlertTriangle size={10} />}
+          {kind === 'dont' && <XCircle size={10} />}
+          {title || p.label}
+        </div>
+        <div className="text-zinc-300 text-[14px] leading-relaxed">{children}</div>
+      </div>
+    );
+  };
+
+  /* NEW: Old/Modern side-by-side comparison block */
+  const OldModern = ({ pair }) => (
+    <div className="my-4 border border-zinc-800">
+      <div className="bg-zinc-950 px-3 py-2 border-b border-zinc-800 text-[11px] uppercase tracking-[0.2em] text-zinc-400" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+        ◐ OLD WAY → MODERN · {pair.topic}
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-zinc-800">
+        <div>
+          <div className="px-3 py-1.5 bg-red-500/10 text-red-300 text-[10px] tracking-[0.2em] uppercase border-b border-zinc-800" style={{ fontFamily: 'JetBrains Mono, monospace' }}>before</div>
+          <pre className="px-3 py-3 text-[12px] text-zinc-300 overflow-x-auto leading-snug" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+            <code>{pair.old}</code>
+          </pre>
+        </div>
+        <div>
+          <div className="px-3 py-1.5 bg-teal-400/10 text-teal-300 text-[10px] tracking-[0.2em] uppercase border-b border-zinc-800" style={{ fontFamily: 'JetBrains Mono, monospace' }}>modern</div>
+          <pre className="px-3 py-3 text-[12px] text-zinc-100 overflow-x-auto leading-snug" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+            <code>{pair.modern}</code>
+          </pre>
+        </div>
+      </div>
+      <div className="border-t border-zinc-800 px-3 py-2 text-[12px] text-zinc-400 leading-relaxed">
+        <span className="text-teal-300 mr-1" style={{ fontFamily: 'JetBrains Mono, monospace' }}>WHY</span>
+        {pair.why}
+      </div>
+    </div>
+  );
+
+  /* NEW: Comparison table block */
+  const ComparisonTable = ({ data }) => (
+    <div className="my-4 border border-zinc-800 overflow-x-auto">
+      <div className="bg-zinc-950 px-3 py-2 border-b border-zinc-800 text-[11px] uppercase tracking-[0.2em] text-purple-300" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+        ▤ {data.title}
+      </div>
+      <table className="w-full text-[12px]">
+        <thead>
+          <tr className="border-b border-zinc-800 bg-zinc-900/50">
+            {data.headers.map((h, i) => (
+              <th key={i} className="text-left px-3 py-2 text-[11px] uppercase tracking-wider text-zinc-500 font-normal" style={{ fontFamily: 'JetBrains Mono, monospace' }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {data.rows.map((row, ri) => (
+            <tr key={ri} className="border-b border-zinc-900 last:border-0">
+              {row.map((cell, ci) => (
+                <td key={ci} className={`px-3 py-2 align-top leading-relaxed ${ci === 0 ? 'text-purple-300' : 'text-zinc-300'}`}
+                    style={ci === 0 ? { fontFamily: 'JetBrains Mono, monospace' } : {}}>
+                  {cell}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  const CheckItem = ({ id, children }) => (
+    <button onClick={() => toggleCheck(id)} className="flex items-start gap-3 w-full text-left py-2 hover:bg-zinc-900/50 px-2 -mx-2 transition-colors">
+      <div className={`mt-0.5 w-4 h-4 border flex items-center justify-center shrink-0 transition-colors ${checklist[id] ? 'bg-purple-400 border-purple-400' : 'border-zinc-600'}`}>
+        {checklist[id] && <Check size={12} className="text-black" strokeWidth={3} />}
+      </div>
+      <span className={`text-[14px] leading-snug ${checklist[id] ? 'text-zinc-500 line-through' : 'text-zinc-200'}`}>{children}</span>
+    </button>
+  );
+
+  const Quiz = ({ quiz }) => {
+    const state = quizState[quiz.qid];
+    return (
+      <div className="my-5 border border-zinc-800 bg-zinc-900/40 p-4">
+        <div className="text-[10px] uppercase tracking-[0.25em] text-teal-300 mb-2" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+          CHECK · {quiz.qid.toUpperCase()}
+        </div>
+        <div className="text-zinc-100 text-[15px] mb-3 whitespace-pre-wrap">{quiz.q}</div>
+        <div className="space-y-1.5">
+          {quiz.opts.map((opt, i) => {
+            const isChosen = state?.choice === i;
+            const isCorrect = i === quiz.a;
+            const reveal = !!state;
+            return (
+              <button key={i} onClick={() => !state && answerQuiz(quiz.qid, i, quiz.a)} disabled={!!state}
+                className={`w-full text-left px-3 py-2 border text-[13px] transition-colors flex items-center gap-2 ${
+                  reveal && isCorrect ? 'border-purple-400 bg-purple-400/10 text-purple-200' :
+                  reveal && isChosen && !isCorrect ? 'border-red-400 bg-red-400/10 text-red-200' :
+                  'border-zinc-800 hover:border-zinc-600 text-zinc-300'
+                }`}>
+                <span className="text-zinc-500" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+                  {String.fromCharCode(65 + i)}
+                </span>
+                {opt}
+                {reveal && isCorrect && <Check size={14} className="ml-auto shrink-0" />}
+                {reveal && isChosen && !isCorrect && <X size={14} className="ml-auto shrink-0" />}
+              </button>
+            );
+          })}
+        </div>
+        {state && (
+          <div className="mt-3 text-[13px] text-zinc-400 leading-relaxed border-l-2 border-zinc-700 pl-3">{quiz.x}</div>
+        )}
+      </div>
+    );
+  };
+
+  const Term = ({ children, name }) => {
+    const key = name || (typeof children === 'string' ? children : null);
+    return (
+      <button onClick={() => key && setTermPopup(key)}
+        className="border-b border-dotted border-purple-400/60 text-purple-200 hover:text-purple-100 transition-colors">
+        {children}
+      </button>
+    );
+  };
+
+  const H2 = ({ children, num }) => (
+    <h3 className="flex items-baseline gap-3 mt-6 mb-3">
+      <span className="text-purple-400 text-[11px] tracking-[0.3em]" style={{ fontFamily: 'JetBrains Mono, monospace' }}>{num}</span>
+      <span className="text-zinc-100 text-[20px] font-semibold" style={{ fontFamily: 'Bricolage Grotesque, sans-serif' }}>{children}</span>
+    </h3>
+  );
+  const P = ({ children }) => <p className="text-zinc-300 text-[15px] leading-relaxed my-3">{children}</p>;
+  const Kbd = ({ children }) => (
+    <code className="bg-zinc-900 border border-zinc-700 px-1.5 py-0.5 text-[12px] text-purple-300" style={{ fontFamily: 'JetBrains Mono, monospace' }}>{children}</code>
+  );
+
+  /* Build pipeline diagram (similar shape to C atlas) */
+  const ArchDiagram = () => {
+    const sel = ARCH_NODES.find(n => n.id === archSelected);
+    return (
+      <div className="my-4">
+        <div className="text-[10px] uppercase tracking-[0.25em] text-zinc-500 mb-2 flex items-center gap-2" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+          <MousePointerClick size={12} /> Tap any stage · the C++ build pipeline
+        </div>
+        <svg viewBox="0 0 290 250" className="w-full bg-zinc-950 border border-zinc-800">
+          <defs>
+            <marker id="cpparr" markerWidth="6" markerHeight="6" refX="6" refY="3" orient="auto">
+              <polygon points="0 0, 6 3, 0 6" fill="#52525b" />
+            </marker>
+          </defs>
+          <line x1="65" y1="50" x2="65" y2="78" stroke="#52525b" markerEnd="url(#cpparr)" />
+          <line x1="65" y1="110" x2="65" y2="138" stroke="#52525b" markerEnd="url(#cpparr)" />
+          <line x1="65" y1="170" x2="65" y2="198" stroke="#52525b" markerEnd="url(#cpparr)" />
+          <line x1="110" y1="214" x2="170" y2="214" stroke="#52525b" markerEnd="url(#cpparr)" />
+          <line x1="215" y1="198" x2="215" y2="170" stroke="#52525b" markerEnd="url(#cpparr)" />
+          <line x1="215" y1="50" x2="215" y2="78" stroke="#52525b" markerEnd="url(#cpparr)" />
+          <line x1="215" y1="110" x2="215" y2="138" stroke="#52525b" markerEnd="url(#cpparr)" />
+          {ARCH_NODES.map(n => {
+            const isSel = archSelected === n.id;
+            return (
+              <g key={n.id} onClick={() => setArchSelected(n.id)} style={{ cursor: 'pointer' }}>
+                <rect x={n.x} y={n.y} width={n.w} height={n.h}
+                  fill={isSel ? n.color + '30' : n.color + '12'} stroke={n.color}
+                  strokeWidth={isSel ? '2' : '1'} />
+                <text x={n.x + n.w / 2} y={n.y + n.h / 2 + 4} textAnchor="middle"
+                  fill="#e4e4e7" fontSize="10"
+                  style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+                  {n.label}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+        {sel && (
+          <div className="mt-2 border border-purple-400/30 bg-purple-400/5 p-3 text-[13px]">
+            <div className="flex items-center justify-between mb-1">
+              <div className="text-purple-300 font-semibold">{sel.label}</div>
+              <button onClick={() => setArchSelected(null)} className="text-zinc-500 hover:text-zinc-300"><X size={14} /></button>
+            </div>
+            <div className="text-zinc-300 leading-relaxed">{sel.desc}</div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  /* NEW: Interactive standards timeline */
+  const TimelineDiagram = () => {
+    const sel = TIMELINE.find(t => t.ver === timelineSelected);
+    return (
+      <div className="my-4">
+        <div className="text-[10px] uppercase tracking-[0.25em] text-zinc-500 mb-2 flex items-center gap-2" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+          <MousePointerClick size={12} /> Tap any release · 28 years of C++
+        </div>
+        <svg viewBox="0 0 600 130" className="w-full bg-zinc-950 border border-zinc-800">
+          <line x1="20" y1="65" x2="580" y2="65" stroke="#3f3f46" strokeWidth="2" />
+          {TIMELINE.map((t, i) => {
+            const x = 30 + (i * (540 / (TIMELINE.length - 1)));
+            const isSel = timelineSelected === t.ver;
+            const isMajor = ['C++11', 'C++20', 'C++26'].includes(t.ver);
+            return (
+              <g key={t.ver} onClick={() => setTimelineSelected(t.ver)} style={{ cursor: 'pointer' }}>
+                <circle cx={x} cy={65} r={isMajor ? '8' : '5'}
+                  fill={isSel ? '#c084fc' : (isMajor ? '#c084fc40' : '#27272a')}
+                  stroke={isMajor ? '#c084fc' : '#71717a'}
+                  strokeWidth={isSel ? '2' : '1'} />
+                <text x={x} y={40} textAnchor="middle" fill={isSel ? '#e9d5ff' : '#a1a1aa'}
+                  fontSize={isMajor ? '11' : '10'} fontWeight={isMajor ? 'bold' : 'normal'}
+                  style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+                  {t.ver}
+                </text>
+                <text x={x} y={95} textAnchor="middle" fill="#52525b" fontSize="9"
+                  style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+                  {t.year}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+        {sel && (
+          <div className="mt-2 border border-purple-400/30 bg-purple-400/5 p-3">
+            <div className="flex items-center justify-between mb-1">
+              <div className="text-purple-300 font-semibold text-[14px]" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+                {sel.ver} <span className="text-zinc-500 text-[11px] font-normal ml-2">{sel.year} · {sel.label}</span>
+              </div>
+              <button onClick={() => setTimelineSelected(null)} className="text-zinc-500 hover:text-zinc-300"><X size={14} /></button>
+            </div>
+            <div className="text-zinc-300 text-[13px] leading-relaxed">{sel.features}</div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  /* ─── SANDBOX: real C++ execution via JSCPP ─── */
+  const Sandbox = () => {
+    const [mode, setMode] = useState('challenges');
+    const [challengeIdx, setChallengeIdx] = useState(0);
+    const challenge = CHALLENGES[challengeIdx];
+    const [code, setCode] = useState(challenge.starter);
+    const [stdinData, setStdinData] = useState('');
+    const [output, setOutput] = useState('');
+    const [testResult, setTestResult] = useState(null);
+    const [running, setRunning] = useState(false);
+    const [status, setStatus] = useState('idle');
+    const jscppRef = useRef(null);
+
+    useEffect(() => {
+      setCode(challenge.starter);
+      setOutput('');
+      setTestResult(null);
+    }, [challengeIdx]);
+
+    useEffect(() => {
+      if (window.JSCPP) { jscppRef.current = window.JSCPP; setStatus('ready'); return; }
+      if (window.__jscppLoading) {
+        const iv = setInterval(() => {
+          if (window.JSCPP) { jscppRef.current = window.JSCPP; setStatus('ready'); clearInterval(iv); }
+        }, 200);
+        setStatus('loading');
+        return () => clearInterval(iv);
+      }
+      window.__jscppLoading = true;
+      setStatus('loading');
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/JSCPP@2.0.9/dist/JSCPP.es5.min.js';
+      script.onload = () => {
+        if (window.JSCPP) { jscppRef.current = window.JSCPP; setStatus('ready'); }
+        else { setStatus('error'); setOutput('❌ JSCPP loaded but global not found.'); }
+      };
+      script.onerror = () => { setStatus('error'); setOutput('❌ Failed to load JSCPP from CDN.'); };
+      document.head.appendChild(script);
+    }, []);
+
+    const runCode = (checkExpected) => {
+      const JSCPP = jscppRef.current;
+      if (!JSCPP) return;
+      setRunning(true);
+      setOutput('');
+      setTestResult(null);
+
+      let collected = '';
+      const config = {
+        stdio: { write: (s) => { collected += s; } },
+        maxTimeout: 5000,
+        unsigned_overflow: 'warn',
+      };
+
+      try {
+        const exitCode = JSCPP.run(code, stdinData, config);
+        let display = collected;
+        if (exitCode !== 0) display += `\n[exit code: ${exitCode}]`;
+        setOutput(display || '(no output)');
+
+        if (checkExpected) {
+          const pass = collected === challenge.expected;
+          setTestResult({ pass, expected: challenge.expected, actual: collected });
+        }
+      } catch (e) {
+        const msg = e?.message || String(e);
+        setOutput((collected ? collected + '\n' : '') + '❌ ' + msg.split('\n').slice(0, 4).join('\n'));
+        if (checkExpected) {
+          setTestResult({ pass: false, expected: challenge.expected, actual: collected, err: msg.split('\n')[0] });
+        }
+      }
+      setRunning(false);
+    };
+
+    const ready = status === 'ready';
+
+    return (
+      <div className="my-4 border border-zinc-800 bg-zinc-900/30">
+        <div className="bg-zinc-950 px-3 py-2 border-b border-zinc-800 flex items-center justify-between gap-2 flex-wrap">
+          <div className="text-[10px] tracking-[0.25em] text-zinc-500 uppercase flex items-center gap-2" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+            <span>LIVE C++ · {mode === 'challenges' ? challenge.title : 'free play'}</span>
+            {status === 'ready' && <span className="text-purple-400">●</span>}
+            {status === 'loading' && <span className="text-amber-400 flex items-center gap-1"><Loader2 size={10} className="animate-spin" /> loading interpreter</span>}
+            {status === 'error' && <span className="text-red-400">● error</span>}
+          </div>
+          <div className="flex gap-1">
+            <button onClick={() => setMode('challenges')} className={`text-[10px] px-2 py-0.5 border ${mode === 'challenges' ? 'border-purple-400 text-purple-300 bg-purple-400/10' : 'border-zinc-700 text-zinc-500'}`} style={{ fontFamily: 'JetBrains Mono, monospace' }}>challenges</button>
+            <button onClick={() => { setMode('freeplay'); setCode("#include <iostream>\n\nint main() {\n    std::cout << \"Hello from C++!\" << std::endl;\n    return 0;\n}\n"); setOutput(''); setTestResult(null); }} className={`text-[10px] px-2 py-0.5 border ${mode === 'freeplay' ? 'border-purple-400 text-purple-300 bg-purple-400/10' : 'border-zinc-700 text-zinc-500'}`} style={{ fontFamily: 'JetBrains Mono, monospace' }}>free play</button>
+          </div>
+        </div>
+
+        {mode === 'challenges' && (
+          <>
+            <div className="px-3 py-2 border-b border-zinc-800 flex items-center gap-1 overflow-x-auto">
+              {CHALLENGES.map((c, i) => (
+                <button key={c.id} onClick={() => setChallengeIdx(i)}
+                  className={`text-[10px] px-2 py-1 border whitespace-nowrap shrink-0 ${i === challengeIdx ? 'border-purple-400 text-purple-300 bg-purple-400/10' : 'border-zinc-800 text-zinc-500 hover:text-zinc-300'}`}
+                  style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+                  {c.title.split(' · ')[0]}
+                </button>
+              ))}
+            </div>
+            <div className="px-3 py-2 border-b border-zinc-800">
+              <div className="text-[13px] text-zinc-300 leading-relaxed">{challenge.desc}</div>
+            </div>
+          </>
+        )}
+
+        <textarea
+          value={code}
+          onChange={e => setCode(e.target.value)}
+          spellCheck={false}
+          className="w-full bg-black text-zinc-100 px-3 py-3 text-[13px] outline-none resize-y min-h-[200px] leading-snug"
+          style={{ fontFamily: 'JetBrains Mono, monospace' }}
+        />
+
+        {mode === 'freeplay' && (
+          <div className="px-3 py-2 border-t border-zinc-800">
+            <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-1" style={{ fontFamily: 'JetBrains Mono, monospace' }}>STDIN (optional)</div>
+            <textarea
+              value={stdinData}
+              onChange={e => setStdinData(e.target.value)}
+              spellCheck={false}
+              placeholder="Lines fed to std::cin / scanf..."
+              className="w-full bg-black text-zinc-100 px-3 py-2 text-[12px] outline-none resize-y min-h-[40px] border border-zinc-800"
+              style={{ fontFamily: 'JetBrains Mono, monospace' }}
+            />
+          </div>
+        )}
+
+        <div className="px-3 py-2 border-t border-zinc-800 flex gap-2">
+          {mode === 'freeplay' ? (
+            <button onClick={() => runCode(false)} disabled={!ready || running}
+              className="flex-1 border border-purple-400 bg-purple-400/10 text-purple-200 px-3 py-2 text-[12px] font-bold hover:bg-purple-400/20 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+              {running ? <><Loader2 size={12} className="animate-spin" /> Running</> : <><Play size={12} /> Run</>}
+            </button>
+          ) : (
+            <>
+              <button onClick={() => runCode(true)} disabled={!ready || running}
+                className="flex-1 border border-purple-400 bg-purple-400/10 text-purple-200 px-3 py-2 text-[12px] font-bold hover:bg-purple-400/20 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+                {running ? <><Loader2 size={12} className="animate-spin" /> Compiling + running</> : <><Play size={12} /> Run + check</>}
+              </button>
+              <button onClick={() => setCode(challenge.starter)}
+                className="border border-zinc-700 text-zinc-400 px-3 py-2 text-[12px] hover:border-zinc-500 transition-colors flex items-center gap-1"
+                style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+                <RotateCcw size={11} /> Reset
+              </button>
+            </>
+          )}
+        </div>
+
+        {(output || testResult) && (
+          <div className="border-t border-zinc-800 bg-black">
+            <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.25em] text-zinc-500 border-b border-zinc-800" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+              OUTPUT
+            </div>
+            <pre className="px-3 py-2 text-[12px] text-zinc-300 max-h-48 overflow-y-auto whitespace-pre-wrap break-words" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+              {output || '(no output)'}
+            </pre>
+            {testResult && (
+              <div className="border-t border-zinc-800 px-3 py-2">
+                <div className={`text-[12px] flex items-start gap-2 py-0.5 ${testResult.pass ? 'text-purple-300' : 'text-red-300'}`} style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+                  {testResult.pass ? <Check size={12} className="shrink-0 mt-0.5" /> : <X size={12} className="shrink-0 mt-0.5" />}
+                  <span>{testResult.pass ? 'OUTPUT MATCHES EXPECTED' : 'OUTPUT MISMATCH'}</span>
+                </div>
+                {!testResult.pass && (
+                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+                    <div>
+                      <div className="text-zinc-500 mb-1">EXPECTED:</div>
+                      <pre className="bg-zinc-900 p-2 text-purple-300 whitespace-pre-wrap break-words">{JSON.stringify(testResult.expected)}</pre>
+                    </div>
+                    <div>
+                      <div className="text-zinc-500 mb-1">GOT:</div>
+                      <pre className="bg-zinc-900 p-2 text-red-300 whitespace-pre-wrap break-words">{JSON.stringify(testResult.actual)}</pre>
+                    </div>
+                  </div>
+                )}
+                {testResult.pass && challengeIdx < CHALLENGES.length - 1 && (
+                  <div className="mt-2 pt-2 border-t border-zinc-800 text-purple-300 text-[12px] font-bold flex items-center gap-1" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+                    <button onClick={() => setChallengeIdx(challengeIdx + 1)} className="text-teal-300 hover:text-teal-100 underline">next challenge →</button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  /* ─── LIBRARY: snippet browser ─── */
+  const LibraryViewer = () => {
+    const cats = Object.keys(LIBRARY);
+    const [activeCat, setActiveCat] = useState(cats[0]);
+    const [expanded, setExpanded] = useState({});
+    const cat = LIBRARY[activeCat];
+    const toggle = (id) => setExpanded(p => ({ ...p, [id]: !p[id] }));
+
+    return (
+      <div className="my-4 border border-zinc-800 bg-zinc-900/20">
+        <div className="bg-zinc-950 px-3 py-2 border-b border-zinc-800 flex items-center gap-2 overflow-x-auto">
+          <div className="text-[10px] tracking-[0.25em] text-zinc-500 uppercase shrink-0 pr-2" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+            <Library size={12} className="inline mr-1" /> LIB
+          </div>
+          {cats.map(c => (
+            <button key={c} onClick={() => setActiveCat(c)}
+              className={`text-[11px] px-2 py-1 border whitespace-nowrap shrink-0 flex items-center gap-1 ${
+                activeCat === c ? 'border-purple-400 text-purple-300 bg-purple-400/10' : 'border-zinc-800 text-zinc-400 hover:text-zinc-200'
+              }`} style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+              <span className="text-purple-300">{LIBRARY[c].icon}</span>
+              {LIBRARY[c].label}
+            </button>
+          ))}
+        </div>
+        <div className="p-3 space-y-2">
+          {cat.snippets.map((s, i) => {
+            const isOpen = !!expanded[s.id];
+            return (
+              <div key={s.id} className="border border-zinc-800">
+                <button onClick={() => toggle(s.id)} className="w-full text-left px-3 py-2 hover:bg-zinc-900/60 flex items-start gap-3 transition-colors">
+                  <span className="text-[10px] text-purple-400 mt-1 shrink-0" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-zinc-100 text-[14px] font-medium" style={{ fontFamily: 'Bricolage Grotesque, sans-serif' }}>{s.title}</div>
+                    <div className="text-zinc-400 text-[12px] mt-0.5">{s.desc}</div>
+                  </div>
+                  <ChevronRight size={14} className={`text-zinc-500 shrink-0 mt-1 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+                </button>
+                {isOpen && (
+                  <div className="border-t border-zinc-800 bg-black/60">
+                    <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-zinc-500 px-3 py-1.5 border-b border-zinc-900">
+                      <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>cpp</span>
+                      <div className="flex items-center gap-3">
+                        <a href={godboltLink(s.code)} target="_blank" rel="noopener noreferrer"
+                          className="flex items-center gap-1 hover:text-teal-300 transition-colors">
+                          <ExternalLink size={11} /> godbolt
+                        </a>
+                        <button onClick={() => copy(s.code, 'lib-' + s.id)} className="flex items-center gap-1.5 hover:text-purple-300 transition-colors">
+                          {copied === 'lib-' + s.id ? <Check size={12} /> : <Copy size={12} />}
+                          {copied === 'lib-' + s.id ? 'copied' : 'copy'}
+                        </button>
+                      </div>
+                    </div>
+                    <pre className="px-3 py-2 text-[12px] text-zinc-200 overflow-x-auto leading-relaxed" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+                      <code>{s.code}</code>
+                    </pre>
+                    {s.note && (
+                      <div className="border-t border-zinc-900 px-3 py-2 text-[12px] text-zinc-400 italic leading-relaxed">
+                        <span className="text-teal-300 not-italic mr-1" style={{ fontFamily: 'JetBrains Mono, monospace' }}>NOTE</span>
+                        {s.note}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  /* ─── Troubleshooter ─── */
+  const Troubleshooter = () => {
+    const [path, setPath] = useState(['start']);
+    const cur = TROUBLESHOOT[path[path.length - 1]];
+    return (
+      <div className="my-4 border border-zinc-800 bg-zinc-900/30">
+        <div className="bg-zinc-950 px-3 py-2 border-b border-zinc-800 flex items-center justify-between">
+          <div className="text-[10px] tracking-[0.25em] text-red-300 uppercase flex items-center gap-2" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+            <Wrench size={12} /> TRIAGE TREE
+          </div>
+          {path.length > 1 && (
+            <button onClick={() => setPath(['start'])} className="text-[11px] text-zinc-500 hover:text-red-300 flex items-center gap-1">
+              <RotateCcw size={11} /> Start over
+            </button>
+          )}
+        </div>
+        <div className="p-4">
+          {path.length > 1 && (
+            <div className="flex items-center gap-1 mb-3 text-[10px] text-zinc-600 flex-wrap" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+              {path.map((p, i) => (
+                <span key={i} className="flex items-center gap-1">
+                  {i > 0 && <ChevronRight size={10} />}
+                  <span className={i === path.length - 1 ? 'text-purple-300' : ''}>{p}</span>
+                </span>
+              ))}
+            </div>
+          )}
+          {cur.q && (
+            <>
+              <div className="text-zinc-100 text-[15px] mb-3 font-medium" style={{ fontFamily: 'Bricolage Grotesque, sans-serif' }}>
+                {cur.q}
+              </div>
+              <div className="space-y-2">
+                {cur.opts.map((opt, i) => (
+                  <button key={i} onClick={() => setPath([...path, opt.next])}
+                    className="w-full text-left border border-zinc-800 hover:border-red-400 hover:bg-red-400/5 px-3 py-2.5 text-[14px] text-zinc-200 transition-colors flex items-center justify-between group">
+                    <span>{opt.label}</span>
+                    <ChevronRight size={14} className="text-zinc-600 group-hover:text-red-300" />
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          {cur.fix && (
+            <>
+              <div className="border-l-2 border-purple-400 pl-3 mb-3">
+                <div className="text-[10px] uppercase tracking-[0.25em] text-purple-300 mb-1" style={{ fontFamily: 'JetBrains Mono, monospace' }}>FIX</div>
+                <div className="text-zinc-200 text-[14px] leading-relaxed">{cur.fix}</div>
+              </div>
+              {cur.steps && (
+                <ol className="space-y-2 mb-3">
+                  {cur.steps.map((s, i) => (
+                    <li key={i} className="flex gap-2 text-[13px] text-zinc-300">
+                      <span className="text-purple-400 shrink-0" style={{ fontFamily: 'JetBrains Mono, monospace' }}>{(i + 1).toString().padStart(2, '0')}</span>
+                      <span>{s}</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </>
+          )}
+          {path.length > 1 && (
+            <button onClick={() => setPath(path.slice(0, -1))}
+              className="mt-4 text-[12px] text-zinc-500 hover:text-zinc-300 flex items-center gap-1">
+              <ArrowLeft size={12} /> Back
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  /* ─── Exports ─── */
+  const exportCheatsheet = () => {
+    let md = "# C++ Atlas — Cheatsheet\n\n";
+    md += "## Dev build (every flag earns its place)\n```bash\ng++ -std=c++26 -Wall -Wextra -Wpedantic -Werror -g \\\n    -fsanitize=address,undefined \\\n    -fno-omit-frame-pointer \\\n    main.cpp -o app\n```\n\n";
+    md += "## Release build\n```bash\ng++ -std=c++23 -O3 -DNDEBUG -flto \\\n    main.cpp -o app\n```\n\n";
+    md += "## Modern C++ essentials\n```cpp\n#include <memory>\n#include <vector>\n#include <string>\n#include <string_view>\n#include <ranges>\n#include <expected>      // C++23\n#include <concepts>      // C++20\n\n// Smart pointers — always make_unique / make_shared\nauto p = std::make_unique<Widget>(args);\nauto s = std::make_shared<Widget>(args);\n\n// Range-based for (C++11)\nfor (auto& x : vec) { /* ... */ }\n\n// C++20 ranges + views\nauto evens = vec | std::views::filter([](int x) { return x%2==0; });\n\n// C++20 concepts\ntemplate<std::integral T> T add(T a, T b) { return a + b; }\n\n// C++23 std::expected\nstd::expected<int, Error> parse(std::string_view s);\n\n// C++26 reflection (preview)\n// constexpr auto info = ^MyType;\n```\n\n";
+    md += "## Rule of 0 / 5 (C++ Core Guidelines C.20, C.21)\n```cpp\n// Rule of 0 — preferred default\nclass Good {\n    std::string name_;       // RAII\n    std::vector<int> data_;  // RAII\n    // No special members defined — compiler-generated correct\n};\n\n// Rule of 5 — when you DO need a destructor, define all 5 (or = default)\nclass Manager {\n    Resource* r_;\npublic:\n    ~Manager();\n    Manager(const Manager&);\n    Manager& operator=(const Manager&);\n    Manager(Manager&&) noexcept;\n    Manager& operator=(Manager&&) noexcept;\n};\n```\n\n";
+    md += "## Smart pointer choice\n- `std::unique_ptr<T>` — sole ownership, zero overhead. **Default.**\n- `std::shared_ptr<T>` — shared ownership, atomic refcount. Use when truly shared.\n- `std::weak_ptr<T>` — break cycles. Non-owning observer.\n- `T*` or `T&` — non-owning function parameter. Reference > pointer when non-null.\n\n";
+    md += "## Commands\n\n";
+    COMMANDS.forEach(c => { md += `**${c.desc}**\n\`\`\`\n${c.cmd}\n\`\`\`\n\n`; });
+    md += "## Authoritative resources\n";
+    RESOURCES.forEach(r => { md += `- **${r.name}** — ${r.url}\n  ${r.note}\n\n`; });
+    md += "\n---\n_Generated by C++ Atlas. Grounded in C++ Core Guidelines, Stroustrup's A Tour of C++, Effective Modern C++ (Meyers), cppreference, and the ISO C++26 final draft (N5046)._\n";
+    const blob = new Blob([md], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'cpp-atlas-cheatsheet.md'; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportLibrary = () => {
+    let md = "# C++ Atlas — Library\n\nA curated snippet collection. All MIT-licensed for your use.\n\n";
+    Object.entries(LIBRARY).forEach(([_, cat]) => {
+      md += `## ${cat.label}\n\n`;
+      cat.snippets.forEach(s => {
+        md += `### ${s.title}\n${s.desc}\n\n\`\`\`cpp\n${s.code}\n\`\`\`\n\n_${s.note}_\n\n`;
+      });
+    });
+    const blob = new Blob([md], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'cpp-atlas-library.md'; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const copyAllCommands = () => {
+    const all = COMMANDS.map(c => `# ${c.desc}\n${c.cmd}`).join('\n\n');
+    copy(all, 'allcmds');
+  };
+
+  const allQuizzes = Object.values(QUIZZES).flat();
+  const missed = allQuizzes.filter(q => quizState[q.qid] && !quizState[q.qid].correct);
+  const totalAnswered = allQuizzes.filter(q => quizState[q.qid]).length;
+  const totalCorrect = allQuizzes.filter(q => quizState[q.qid]?.correct).length;
+
+  /* ─── Command Palette ─── */
+  const CommandPalette = () => {
+    const [q, setQ] = useState('');
+    const items = [
+      ...SECTIONS.map((s, i) => ({ kind: 'chapter', label: s.label, idx: i, hint: s.sub })),
+      ...Object.keys(GLOSSARY).map(t => ({ kind: 'term', label: t, hint: GLOSSARY[t].slice(0, 80) + '…' })),
+      ...COMMANDS.map(c => ({ kind: 'command', label: c.cmd, hint: c.desc, copy: c.cmd })),
+      ...Object.entries(LIBRARY).flatMap(([cat, c]) =>
+        c.snippets.map(s => ({ kind: 'library', label: s.title, hint: `${c.label} · ${s.desc}` }))
+      ),
+    ];
+    const ql = q.toLowerCase();
+    const filtered = q ? items.filter(i => i.label.toLowerCase().includes(ql) || i.hint?.toLowerCase().includes(ql)) : items.slice(0, 24);
+    return (
+      <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-start justify-center p-4 pt-20" onClick={() => setCmdOpen(false)}>
+        <div className="max-w-lg w-full bg-zinc-950 border border-purple-400/40 shadow-2xl" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-zinc-800">
+            <Search size={14} className="text-purple-300" />
+            <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Chapters · terms · commands · library"
+              className="flex-1 bg-transparent text-zinc-100 placeholder-zinc-600 outline-none text-[14px]" />
+            <kbd className="text-[10px] text-zinc-500 border border-zinc-700 px-1.5 py-0.5" style={{ fontFamily: 'JetBrains Mono, monospace' }}>ESC</kbd>
+          </div>
+          <div className="max-h-96 overflow-y-auto">
+            {filtered.length === 0 && <div className="px-4 py-6 text-zinc-500 text-center text-[13px]">No results.</div>}
+            {filtered.map((item, i) => (
+              <button key={i}
+                onClick={() => {
+                  if (item.kind === 'chapter') { setActiveSection(item.idx); setCmdOpen(false); }
+                  else if (item.kind === 'term') { setTermPopup(item.label); setCmdOpen(false); }
+                  else if (item.kind === 'command') { copy(item.copy, 'cmd-' + i); }
+                  else if (item.kind === 'library') { setActiveSection(8); setCmdOpen(false); }
+                }}
+                className="w-full text-left px-4 py-2.5 hover:bg-zinc-900 border-b border-zinc-900 flex items-start gap-3">
+                <span className={`text-[9px] uppercase tracking-wider mt-1 shrink-0 w-16 ${
+                  item.kind === 'chapter' ? 'text-purple-300' :
+                  item.kind === 'term' ? 'text-teal-300' :
+                  item.kind === 'library' ? 'text-amber-300' : 'text-red-300'
+                }`} style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+                  {item.kind}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-zinc-100 text-[13px] truncate" style={{ fontFamily: item.kind === 'command' ? 'JetBrains Mono, monospace' : 'inherit' }}>
+                    {item.label}
+                  </div>
+                  {item.hint && <div className="text-zinc-500 text-[11px] truncate mt-0.5">{item.hint}</div>}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const TermPopover = () => {
+    if (!termPopup) return null;
+    const def = GLOSSARY[termPopup];
+    return (
+      <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={() => setTermPopup(null)}>
+        <div className="max-w-md w-full bg-zinc-950 border border-purple-400/40 p-5" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-[10px] uppercase tracking-[0.3em] text-purple-300" style={{ fontFamily: 'JetBrains Mono, monospace' }}>GLOSSARY</div>
+            <button onClick={() => setTermPopup(null)} className="text-zinc-500 hover:text-zinc-200"><X size={16} /></button>
+          </div>
+          <div className="text-zinc-100 text-[18px] font-bold mb-2" style={{ fontFamily: 'Bricolage Grotesque, sans-serif' }}>{termPopup}</div>
+          <div className="text-zinc-300 text-[14px] leading-relaxed">{def || 'No definition yet.'}</div>
+        </div>
+      </div>
+    );
+  };
+
+  const Onboarding = () => (
+    <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
+      <div className="max-w-md w-full bg-zinc-950 border border-purple-400/40 p-6">
+        <div className="text-[10px] uppercase tracking-[0.3em] text-purple-400 mb-2" style={{ fontFamily: 'JetBrains Mono, monospace' }}>∷ CALIBRATING</div>
+        <h2 className="text-[22px] font-bold mb-2" style={{ fontFamily: 'Bricolage Grotesque, sans-serif' }}>What are you using C++ for?</h2>
+        <p className="text-zinc-400 text-[13px] mb-4">Examples will adapt. Change anytime.</p>
+        <div className="space-y-2">
+          {STACKS.map(s => (
+            <button key={s.id} onClick={() => { setStack(s.id); setShowOnboarding(false); }}
+              className="block w-full text-left p-3 border border-zinc-800 hover:border-purple-400 hover:bg-purple-400/5 transition-colors">
+              <div className="flex items-baseline gap-2">
+                <span className="text-purple-400 text-[14px]" style={{ fontFamily: 'JetBrains Mono, monospace' }}>{s.icon}</span>
+                <div className="flex-1">
+                  <div className="text-zinc-100 text-[14px] font-medium">{s.label}</div>
+                  <div className="text-zinc-500 text-[12px]">{s.desc}</div>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  const stackData = stack && PERSONALIZED[stack];
+  const stackLabel = STACKS.find(s => s.id === stack)?.label;
+
+  /* ─── Sections ─── */
+  const renderSection = () => {
+    switch (activeSection) {
+      case 0:
+        return (
+          <>
+            <H2 num="◇ 1979">From a Bell Labs PhD project</H2>
+            <P>
+              Bjarne Stroustrup started 'C with Classes' at Bell Labs in 1979, adapting Simula's object-oriented ideas to C's efficiency. Renamed C++ in 1983 (a play on C's increment operator). The first book, 'The C++ Programming Language,' appeared 1985. ISO standardization in 1998 (C++98) — and then almost nothing changed for 13 years.
+            </P>
+            <P>
+              C++11 (2011) was the revolution: auto, lambdas, move semantics, smart pointers, range-for. Pre-C++11 is now widely called 'legacy C++.' Every release since has held a three-year cadence — the 'train model' — landing features when they're ready rather than holding the whole standard for one delayed proposal.
+            </P>
+            <H2 num="◇ TIMELINE">28 years of C++</H2>
+            <TimelineDiagram />
+            <Callout kind="cite" title="C++26 STATUS">
+              C++26 was finalized at the WG21 London meeting March 28, 2026 — less than two months ago. Three landmark features: static reflection (P2996), contracts (P2900), std::execution senders/receivers (P2300). Final draft N5046. GCC 14+ and Clang have experimental support; expect mainline by GCC 16.1+. (Sources: Herb Sutter's trip report; isocpp.org)
+            </Callout>
+            <H2 num="◇ WHY">Why C++ still dominates in 2026</H2>
+            <P>
+              <strong>Performance + abstraction.</strong> No other language gives you bare-metal control AND modern abstractions (templates, ranges, coroutines, RAII) at zero runtime cost. The 'zero-overhead principle' is C++'s identity.
+            </P>
+            <P>
+              <strong>Where it lives.</strong> Game engines (Unreal, Unity native), browsers (V8, Blink, WebKit), databases (MongoDB, MySQL), HPC + scientific (CERN, NASA), HFT + finance (most major firms), graphics (OpenGL/Vulkan apps, CAD, VFX), embedded with constraints. The dominant language for performance-critical infrastructure.
+            </P>
+            <Callout kind="info" title="THE TRADE">
+              C++ is the largest mainstream language by surface area. Mastery is a multi-year journey. The leverage: every codebase rewards the same skills — ownership reasoning, RAII intuition, template fluency, respect for UB. Tools (sanitizers, Core Guidelines, static analyzers) make the modern practice safe.
+            </Callout>
+            {QUIZZES.origin.map(q => <Quiz key={q.qid} quiz={q} />)}
+          </>
+        );
+
+      case 1:
+        return (
+          <>
+            <H2 num="◇ PIPELINE">The C++ build pipeline</H2>
+            <P>
+              Same four phases as C — preprocessor, compiler, assembler, linker — but each is heavier. Preprocessor expansion of common headers can produce megabytes of code per .cpp. The compiler does template instantiation, name mangling, and ODR resolution. The linker handles weak symbols and COMDAT folding for templates.
+            </P>
+            <ArchDiagram />
+            <H2 num="◇ DEV-MODE">The dev incantation</H2>
+            <Code id="dev-mode" lang="bash" godbolt={false}>{`g++ -std=c++26 \\
+    -Wall -Wextra -Wpedantic \\
+    -Werror \\
+    -Wshadow -Wnon-virtual-dtor -Wold-style-cast \\
+    -g -O0 \\
+    -fsanitize=address,undefined \\
+    -fno-omit-frame-pointer \\
+    main.cpp -o app`}</Code>
+            <div className="grid gap-1.5 my-3 text-[12px]">
+              {[
+                { flag: '-std=c++26', what: 'Latest standard (finalized March 2026). Use c++23 for portability if you don\'t need C++26 features.' },
+                { flag: '-Wall -Wextra -Wpedantic', what: 'Standard warning set + strict ISO conformance.' },
+                { flag: '-Wnon-virtual-dtor', what: 'Catches deleted-via-base-pointer UB. Critical for polymorphic classes.' },
+                { flag: '-Wold-style-cast', what: 'Forbids (int)x — must use static_cast/dynamic_cast/reinterpret_cast.' },
+                { flag: '-fsanitize=address,undefined', what: 'ASAN + UBSAN. Catches buffer overflows, UAF, signed overflow, null deref.' },
+              ].map(f => (
+                <div key={f.flag} className="border border-zinc-800 px-3 py-1.5">
+                  <code className="text-purple-300 text-[11px]" style={{ fontFamily: 'JetBrains Mono, monospace' }}>{f.flag}</code>
+                  <div className="text-zinc-400 text-[11px] mt-0.5">{f.what}</div>
+                </div>
+              ))}
+            </div>
+            <H2 num="◇ CMAKE">Modern CMake — the de facto C++ build system</H2>
+            <P>
+              Plain Make works for C; serious C++ needs more. Cross-platform builds, template instantiation, header dependency tracking, third-party package integration, multi-compiler support — CMake handles it. The <em>modern</em> CMake style (post-3.x, target-based, not variable-based) is what to learn — many older tutorials show the bad pattern.
+            </P>
+            <Code id="cmake-min" lang="cmake" godbolt={false}>{`cmake_minimum_required(VERSION 3.25)
+project(myapp LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+add_executable(myapp src/main.cpp)
+
+target_compile_options(myapp PRIVATE
+    -Wall -Wextra -Wpedantic
+    $<$<CONFIG:Debug>:-g -fsanitize=address,undefined>
+)
+target_link_options(myapp PRIVATE
+    $<$<CONFIG:Debug>:-fsanitize=address,undefined>
+)`}</Code>
+            <Callout kind="tip" title="GENERATOR">
+              Use <Kbd>cmake -B build -GNinja</Kbd> — Ninja is dramatically faster than Make for C++ (parallel by default, smarter dep tracking). All major IDEs (CLion, VS, VSCode) read <Kbd>compile_commands.json</Kbd> for accurate completion.
+            </Callout>
+            <H2 num="◇ ABI">ABI — the hidden cost of C++</H2>
+            <P>
+              C++ has notoriously unstable ABI. Name mangling, vtable layout, std::string internals — all differ between toolchains. Mix libstdc++ and libc++? Crash. Mix C++17 and C++20 builds of the same dep? Sometimes works, sometimes crashes mysteriously.
+            </P>
+            <Callout kind="warn" title="ABI HAZARD">
+              When you change toolchain (GCC version, libstdc++ version, _GLIBCXX_DEBUG mode), recompile ALL your C++ dependencies. The C ABI is stable across decades; the C++ ABI gets broken by minor changes. For library boundaries that MUST be stable: PIMPL idiom, or expose a C API.
+            </Callout>
+            {QUIZZES.toolchain.map(q => <Quiz key={q.qid} quiz={q} />)}
+          </>
+        );
+
+      case 2:
+        return (
+          <>
+            <H2 num="◇ TYPES">The bedrock types</H2>
+            <Code id="types">{`#include <cstdint>
+#include <cstddef>
+
+// Integers — sizes from <cstdint>, portable widths
+int8_t   int16_t   int32_t   int64_t
+uint8_t  uint16_t  uint32_t  uint64_t
+intptr_t uintptr_t                  // hold a pointer's bits
+ptrdiff_t                           // pointer difference
+size_t                              // sizes — unsigned
+
+// Floating
+float       // ~7 decimal digits
+double      // ~15 decimal digits — DEFAULT for floating arithmetic
+long double // platform-dependent (80-bit on x86, 128-bit on some)
+
+// Booleans + characters
+bool         // true / false — distinct type
+char         // ONE byte; signedness implementation-defined
+char8_t      // C++20 — UTF-8 unit
+char16_t     // UTF-16 unit (C++11)
+char32_t     // UTF-32 unit (C++11)
+wchar_t      // platform — avoid for portable code`}</Code>
+            <H2 num="◇ REFS">References vs pointers</H2>
+            <OldModern pair={{
+              topic: 'Function parameters',
+              old: `// Pre-C++11 — pointers everywhere
+void translate(Point* p, int dx, int dy) {
+    if (!p) return;          // null check
+    p->x += dx;
+    p->y += dy;
+}
+Point pt{};
+translate(&pt, 1, 2);`,
+              modern: `// References for non-null + non-owning
+void translate(Point& p, int dx, int dy) {
+    p.x += dx;                // no null possible
+    p.y += dy;
+}
+Point pt{};
+translate(pt, 1, 2);
+
+// const reference for non-owning, non-modifying, large types
+void print(const std::string& s);   // no copy`,
+              why: "References cannot be null and cannot be reseated. Use them whenever you mean 'this MUST refer to something.' Use raw pointers ONLY for nullable observers (and even then, std::optional<T&> or std::observer_ptr in some libraries is cleaner)."
+            }} />
+            <H2 num="◇ CONSTS">const · constexpr · consteval · constinit</H2>
+            <Code id="consts">{`int rt = read_runtime_input();    // ordinary mutable
+
+const int x = 5;                  // RUNTIME constant — bound to a value
+const int y = rt;                 // ok, but determined at runtime
+// y = 6;                          // ERROR — can't reassign
+
+constexpr int z = 5;              // COMPILE-TIME constant
+// constexpr int w = rt;           // ERROR — rt not constant
+constexpr int sq(int v) {         // function evaluable at compile time
+    return v * v;
+}
+constexpr int s = sq(10);         // computed at compile time → 100
+
+// C++20: consteval — MUST be compile time
+consteval int abs_ct(int v) {
+    return v < 0 ? -v : v;
+}
+// abs_ct(rt);                     // ERROR — must be constant expression
+
+// C++20: constinit — guarantees compile-time initialization (but stays mutable)
+constinit int counter = 0;        // initialized at compile time
+// counter = 1;                    // ok — constinit allows runtime mutation`}</Code>
+            <H2 num="◇ VALUE-CAT">Value categories</H2>
+            <P>
+              Every C++ expression has a <Term>value category</Term>. Understanding them is what turns 'I memorized std::move' into 'I understand move semantics.'
+            </P>
+            <ComparisonTable data={COMPARISONS.value_categories} />
+            <Code id="value-cats">{`int x = 5;
+int& foo();      // returns lvalue reference
+int  bar();      // returns by value (prvalue)
+int&& baz();     // returns rvalue reference (xvalue when called)
+
+x;               // lvalue — has a name, can take &x
+42;              // prvalue — literal
+foo();           // lvalue — function returning T&
+bar();           // prvalue — function returning T
+baz();           // xvalue — function returning T&&
+std::move(x);    // xvalue — std::move casts to T&&
+
+int&& r = 5;     // r is an LVALUE (despite the && type) — it has a name
+                 // The 5 was a prvalue, bound to r, which extended its lifetime
+foo() = 10;      // ok — foo() is lvalue
+// bar() = 10;   // ERROR — bar() is prvalue, can't assign`}</Code>
+            <Callout kind="info" title="THE INSIGHT">
+              <strong>rvalue-ness lives in the TYPE</strong>; lvalue-ness lives in the EXPRESSION. A named <Kbd>T&&</Kbd> variable is an LVALUE — that's why you need <Kbd>std::move</Kbd> inside functions to turn it back into an rvalue when you want move behavior. This trips up everyone learning move semantics.
+            </Callout>
+            {QUIZZES.bedrock.map(q => <Quiz key={q.qid} quiz={q} />)}
+          </>
+        );
+
+      case 3:
+        return (
+          <>
+            <H2 num="◇ RAII">The killer idiom</H2>
+            <P>
+              <Term>RAII</Term> — Resource Acquisition Is Initialization. The most important C++ concept. Resource lifetime is tied to object lifetime: constructor acquires, destructor releases. Stack objects clean up automatically at scope exit. Exception-safe by construction.
+            </P>
+            <Code id="raii-basic">{`#include <fstream>
+#include <mutex>
+
+void process() {
+    std::ifstream file("data.txt");        // ctor opens
+    std::lock_guard<std::mutex> lock(m);   // ctor locks mutex
+
+    if (some_condition_throws()) throw std::runtime_error("oops");
+
+    // ... use file, hold lock ...
+
+    // Destructors run automatically — in REVERSE order:
+    //   lock_guard destructor unlocks mutex
+    //   ifstream destructor closes file
+    // Both happen whether we exit normally or by exception
+}`}</Code>
+            <P>
+              Every resource — memory, file handle, lock, network socket, GL context, GPU buffer, transaction — gets a class whose destructor releases. C# <Kbd>using</Kbd>, Python <Kbd>with</Kbd>, Java try-with-resources are all RAII descendants. None do it as cleanly as C++ stack scoping.
+            </P>
+            <H2 num="◇ SPECIAL">The special member functions</H2>
+            <ComparisonTable data={COMPARISONS.special_members} />
+            <H2 num="◇ R05">Rule of 0 (preferred) and Rule of 5</H2>
+            <P>
+              <strong>Rule of 0:</strong> If your members are all RAII-managed (std::string, std::vector, std::unique_ptr), define NONE of the six special members. The compiler-generated defaults are correct. This is the modern default — Core Guidelines C.20.
+            </P>
+            <P>
+              <strong>Rule of 5:</strong> If you DO need a custom destructor (managing a raw resource), you likely need to define all five — destructor, copy constructor, copy assignment, move constructor, move assignment. Or <Kbd>= default</Kbd> / <Kbd>= delete</Kbd> them explicitly. Core Guidelines C.21.
+            </P>
+            <Code id="rule0">{`// RULE OF 0 — the modern default
+class Document {
+    std::string title_;
+    std::vector<std::string> lines_;
+    std::unique_ptr<Renderer> renderer_;
+    // No special members — compiler-generated are correct:
+    //   destructor: destroys all members (string, vector, unique_ptr destructors)
+    //   copy: deep copies string + vector; unique_ptr is move-only → copy disabled
+    //   move: moves all members
+};
+
+// RULE OF 5 — when you manage a raw resource
+class FileHandle {
+    FILE* f_;
+public:
+    explicit FileHandle(const char* path) : f_(fopen(path, "r")) {}
+    ~FileHandle() noexcept { if (f_) fclose(f_); }
+
+    // Move
+    FileHandle(FileHandle&& other) noexcept : f_(std::exchange(other.f_, nullptr)) {}
+    FileHandle& operator=(FileHandle&& other) noexcept {
+        if (this != &other) {
+            if (f_) fclose(f_);
+            f_ = std::exchange(other.f_, nullptr);
+        }
+        return *this;
+    }
+
+    // Disable copy (or implement deep copy if it makes sense)
+    FileHandle(const FileHandle&) = delete;
+    FileHandle& operator=(const FileHandle&) = delete;
+};`}</Code>
+            <Callout kind="dont" title="THROWING DESTRUCTORS">
+              Destructors should be <Kbd>noexcept</Kbd> (and are by default since C++11). A destructor throwing during stack unwinding from ANOTHER exception calls <Kbd>std::terminate</Kbd>. If your dtor must do something that could throw, catch internally.
+            </Callout>
+            <H2 num="◇ MOVE">Move semantics</H2>
+            <OldModern pair={{
+              topic: 'Returning a large object',
+              old: `// Pre-C++11 — return by value was scary (expensive copy)
+std::vector<int> build_v() {
+    std::vector<int> v(1'000'000, 42);
+    return v;       // copy in pre-NRVO compilers; assumed slow
+}
+std::vector<int> result = build_v();   // copy(?)`,
+              modern: `// C++11+ — return by value is cheap (move or RVO)
+std::vector<int> build_v() {
+    std::vector<int> v(1'000'000, 42);
+    return v;       // moved, or elided entirely (RVO)
+}
+auto result = build_v();   // no copy
+
+// Transfer explicitly via std::move
+std::vector<int> a = build_v();
+std::vector<int> b = std::move(a);   // a is now empty
+// don't use a after move (valid but unspecified)`,
+              why: "Move constructors steal resources from a soon-to-die object — O(1) pointer swap instead of O(n) copy. Return-by-value in C++11+ uses RVO (the compiler elides the move entirely) or moves. Return-by-value of large objects is now CORRECT and FAST."
+            }} />
+            <Callout kind="info" title="NOEXCEPT MOVE">
+              Mark move constructors and move assignment <Kbd>noexcept</Kbd>. <Kbd>std::vector</Kbd> and friends check <Kbd>is_nothrow_move_constructible</Kbd> on reallocation — if false, they COPY instead of move. Forgetting <Kbd>noexcept</Kbd> on move is a silent performance bug.
+            </Callout>
+            {stackData?.classes && <Callout kind="you" title={`FOR YOUR STACK · ${stackLabel}`}>{stackData.classes}</Callout>}
+            {QUIZZES.classes.map(q => <Quiz key={q.qid} quiz={q} />)}
+          </>
+        );
+
+      case 4:
+        return (
+          <>
+            <H2 num="◇ SMART">Smart pointers — the modern way</H2>
+            <P>
+              Raw <Kbd>new</Kbd> / <Kbd>delete</Kbd> survives in low-level code (placement new, custom allocators, intrusive structures). For everything else: smart pointers. They're zero-overhead (unique_ptr) or low-overhead (shared_ptr) and remove the entire class of leak/double-free/use-after-free bugs.
+            </P>
+            <ComparisonTable data={COMPARISONS.smart_ptrs} />
+            <OldModern pair={{
+              topic: 'Heap allocation',
+              old: `// Pre-C++11 — manual new/delete
+Widget* w = new Widget(args);
+try {
+    use(w);
+    delete w;
+} catch (...) {
+    delete w;        // duplicated cleanup — error-prone
+    throw;
+}`,
+              modern: `// C++14+ — make_unique, exception-safe
+auto w = std::make_unique<Widget>(args);
+use(*w);
+// w destroyed automatically — even if use() throws
+
+// Transfer ownership: just std::move
+auto w2 = std::move(w);    // w is now nullptr; w2 owns it`,
+              why: "make_unique is exception-safe (allocate + construct atomic), self-documenting (sole ownership obvious from type), and frees automatically. No leak paths, no double-free, no manual try/catch."
+            }} />
+            <Callout kind="dont" title="RAW NEW / DELETE">
+              <Kbd>new</Kbd> and <Kbd>delete</Kbd> have no place in modern application code. <Kbd>std::make_unique&lt;T&gt;(args)</Kbd> for sole ownership; <Kbd>std::make_shared&lt;T&gt;(args)</Kbd> for shared. Core Guidelines R.11. The atlas's Library chapter has smart-pointer recipes for every common case.
+            </Callout>
+            <H2 num="◇ CYCLES">The shared_ptr cycle problem</H2>
+            <P>
+              <Kbd>shared_ptr</Kbd> is REFERENCE COUNTED, not GARBAGE COLLECTED. If A holds <Kbd>shared_ptr&lt;B&gt;</Kbd> and B holds <Kbd>shared_ptr&lt;A&gt;</Kbd>, neither refcount reaches zero. Both leak. The fix: <Kbd>weak_ptr</Kbd> on one side of the cycle.
+            </P>
+            <Code id="weak-cycle">{`#include <memory>
+
+class Node : public std::enable_shared_from_this<Node> {
+public:
+    void add_child(std::shared_ptr<Node> child) {
+        child->parent_ = weak_from_this();         // weak — doesn't extend lifetime
+        children_.push_back(std::move(child));
+    }
+    std::shared_ptr<Node> parent() const {
+        return parent_.lock();   // returns null shared_ptr if parent died
+    }
+private:
+    std::weak_ptr<Node> parent_;
+    std::vector<std::shared_ptr<Node>> children_;
+};
+
+// Rule of thumb:
+//   'down' relationships own       → shared_ptr (or unique_ptr if sole)
+//   'up' relationships observe     → weak_ptr (or raw pointer)`}</Code>
+            <H2 num="◇ CUSTOM">Custom deleters — wrap any C resource</H2>
+            <Code id="custom-deleter">{`#include <memory>
+#include <cstdio>
+
+// Stateless deleter — zero space overhead via EBO
+struct FileCloser {
+    void operator()(FILE* f) const noexcept { if (f) fclose(f); }
+};
+using UniqueFile = std::unique_ptr<FILE, FileCloser>;
+
+UniqueFile open_log(const char* path) {
+    return UniqueFile(fopen(path, "w"));
+}
+
+// Works for sqlite3*, OpenGL handles, OS handles, anything with a close fn
+struct SqliteCloser { void operator()(sqlite3* db) { sqlite3_close(db); } };
+using UniqueSqlite = std::unique_ptr<sqlite3, SqliteCloser>;`}</Code>
+            {stackData?.memory && <Callout kind="you" title={`FOR YOUR STACK · ${stackLabel}`}>{stackData.memory}</Callout>}
+            {QUIZZES.memory.map(q => <Quiz key={q.qid} quiz={q} />)}
+          </>
+        );
+
+      case 5:
+        return (
+          <>
+            <H2 num="◇ TEMPLATE">Templates — compile-time generics</H2>
+            <P>
+              Templates generate types or functions from type parameters. Each instantiation produces specialized code — no runtime overhead. Foundation of the entire STL.
+            </P>
+            <Code id="template-basics">{`// Function template
+template<typename T>
+T max(T a, T b) {
+    return (a > b) ? a : b;
+}
+
+max(3, 5);              // T = int
+max(3.14, 2.71);        // T = double
+max<int>(3, 5L);        // explicit — T = int, 5L converted
+
+// Class template
+template<typename T, size_t N>
+class FixedArray {
+    T data_[N];
+public:
+    T& operator[](size_t i) { return data_[i]; }
+    constexpr size_t size() const { return N; }
+};
+
+FixedArray<int, 10> arr;`}</Code>
+            <H2 num="◇ CONCEPTS">C++20 concepts — constrain templates cleanly</H2>
+            <OldModern pair={{
+              topic: 'Constraining template type',
+              old: `// SFINAE — pre-C++20
+#include <type_traits>
+
+template<typename T,
+         typename = std::enable_if_t<std::is_integral_v<T>>>
+T add(T a, T b) { return a + b; }
+
+// Error: substitution failure
+//   template<typename, typename> ... not viable
+//   note: candidate template ignored: requirement
+//         'std::is_integral_v<...>' was not satisfied
+// (Plus 30 more lines of dependent-type noise)`,
+              modern: `// C++20 concepts — readable
+#include <concepts>
+
+template<std::integral T>
+T add(T a, T b) { return a + b; }
+
+// Or even cleaner — abbreviated function template:
+auto add(std::integral auto a, std::integral auto b) {
+    return a + b;
+}
+
+// Error if violated:
+//   error: 'std::string' does not satisfy 'integral'`,
+              why: "Concepts give readable constraints AND great error messages. Pre-C++20 SFINAE errors were notoriously cryptic — pages of substitution failure depth. Use concepts for all new code that needs constraints."
+            }} />
+            <H2 num="◇ STD-CONCEPTS">Standard concepts (cppreference.com/w/cpp/concepts)</H2>
+            <Code id="std-concepts">{`#include <concepts>
+
+// Type relationships
+std::same_as<T, U>           // T and U are the same type
+std::derived_from<T, B>      // T derives from B
+std::convertible_to<T, U>    // T can convert to U
+
+// Categorical
+std::integral<T>             // any integer type
+std::floating_point<T>       // any float type
+std::signed_integral<T>      // signed integers
+std::unsigned_integral<T>
+
+// Equality + ordering
+std::equality_comparable<T>      // has ==
+std::totally_ordered<T>          // has <, <=, >, >=
+
+// Object semantics
+std::movable<T>                  // move ctor + assign
+std::copyable<T>                 // copy + move
+std::semiregular<T>              // copyable + default-constructible
+std::regular<T>                  // semiregular + equality_comparable
+
+// Callable
+std::invocable<F, Args...>       // F(Args...) is valid
+std::predicate<F, Args...>       // F(Args...) returns bool`}</Code>
+            <H2 num="◇ CRTP">CRTP — compile-time polymorphism</H2>
+            <Code id="crtp">{`// Curiously Recurring Template Pattern
+template<typename Derived>
+class Shape {
+public:
+    double area() const {
+        return static_cast<const Derived*>(this)->area_impl();
+    }
+};
+
+class Circle : public Shape<Circle> {
+    double r_;
+public:
+    explicit Circle(double r) : r_(r) {}
+    double area_impl() const { return 3.14159 * r_ * r_; }
+};
+
+class Square : public Shape<Square> {
+    double s_;
+public:
+    explicit Square(double s) : s_(s) {}
+    double area_impl() const { return s_ * s_; }
+};
+
+// Polymorphic via template — but resolved AT COMPILE TIME, no vtable
+template<typename S>
+void print_area(const Shape<S>& s) {
+    std::cout << s.area() << "\\n";   // static dispatch
+}`}</Code>
+            <Callout kind="info" title="WHEN CRTP">
+              CRTP gives you compile-time polymorphism with zero runtime cost — no vtable, no virtual call. Used in <Kbd>std::enable_shared_from_this</Kbd>, Eigen expression templates, range-v3 view bases. Trade-off: each <Kbd>Shape&lt;X&gt;</Kbd> is a different type, so no heterogeneous container — use virtual when you need a runtime mix.
+            </Callout>
+            <H2 num="◇ VARIADIC">Variadic templates + fold expressions</H2>
+            <Code id="variadic">{`// Variadic — any number of type args
+template<typename... Args>
+void print(const Args&... args) {
+    // C++17 fold expression — collapses pack over operator
+    ((std::cout << args << " "), ...);
+    std::cout << "\\n";
+}
+
+print(1, "hello", 3.14, 'x');     // works for any types
+
+// Perfect forwarding — the make_unique pattern
+template<typename T, typename... Args>
+std::unique_ptr<T> my_make_unique(Args&&... args) {
+    return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
+}
+
+// std::forward preserves value category:
+//   lvalue stays lvalue, rvalue stays rvalue — required for perfect forwarding`}</Code>
+            {QUIZZES.templates.map(q => <Quiz key={q.qid} quiz={q} />)}
+          </>
+        );
+
+      case 6:
+        return (
+          <>
+            <H2 num="◇ STL">The Standard Template Library</H2>
+            <P>
+              Containers, iterators, algorithms — Alexander Stepanov's generic-programming triad. Designed in 1990s, integrated into C++98, refined through C++26. Almost every C++ codebase touches it.
+            </P>
+            <H2 num="◇ CONTAINERS">Picking the right container</H2>
+            <ComparisonTable data={COMPARISONS.containers} />
+            <Callout kind="tip" title="DEFAULT TO VECTOR">
+              <Kbd>std::vector</Kbd> wins almost every time. Contiguous memory = cache-friendly. Modern CPUs prefer sequential access at ratios that crush 'theoretically faster' structures like <Kbd>std::list</Kbd>. Reach for <Kbd>vector</Kbd> first; switch only when measurements demand it.
+            </Callout>
+            <H2 num="◇ ITERATION">Range-for + ranges</H2>
+            <OldModern pair={{
+              topic: 'Iteration',
+              old: `// Pre-C++11 — iterators with full type
+std::vector<int>::iterator it;
+for (it = vec.begin(); it != vec.end(); ++it) {
+    *it *= 2;
+}`,
+              modern: `// C++11 range-for
+for (auto& x : vec) {
+    x *= 2;
+}
+
+// C++20 ranges algorithm
+std::ranges::for_each(vec, [](int& x) { x *= 2; });
+
+// C++20 views (lazy pipeline)
+auto big_evens = vec
+    | std::views::filter([](int x) { return x % 2 == 0; })
+    | std::views::transform([](int x) { return x * x; })
+    | std::views::take(3);`,
+              why: "Range-for (C++11) replaces every iterator loop in everyday code. <Kbd>auto&</Kbd> to modify, <Kbd>const auto&</Kbd> for large read-only types, <Kbd>auto</Kbd> for cheap copies (int, ptr). Ranges (C++20) add lazy, composable pipelines."
+            }} />
+            <H2 num="◇ ALGOS">The algorithms you use weekly</H2>
+            <Code id="algos">{`#include <algorithm>
+#include <ranges>
+#include <numeric>
+
+std::vector<int> v = {3, 1, 4, 1, 5, 9, 2, 6};
+
+// Sort + unique
+std::ranges::sort(v);
+auto last = std::ranges::unique(v).begin();
+v.erase(last, v.end());
+
+// Find
+auto it = std::ranges::find(v, 5);
+auto it2 = std::ranges::find_if(v, [](int x) { return x > 3; });
+
+// Counting
+int count = std::ranges::count_if(v, [](int x) { return x > 2; });
+
+// Transforming (in place)
+std::ranges::transform(v, v.begin(), [](int x) { return x * 2; });
+
+// Accumulating / reducing
+int sum = std::ranges::fold_left(v, 0, std::plus<>{});       // C++23
+
+// Min/max
+auto [mn, mx] = std::ranges::minmax(v);
+
+// Partitioning
+auto mid = std::ranges::partition(v, [](int x) { return x % 2 == 0; });
+// [v.begin(), mid) = evens; [mid, v.end()) = odds`}</Code>
+            <H2 num="◇ STRING-VIEW">std::string_view — non-owning string param</H2>
+            <Code id="sv">{`#include <string_view>
+#include <string>
+
+// Accepts std::string, char*, string literals — no copy
+bool starts_with(std::string_view s, std::string_view prefix) {
+    return s.size() >= prefix.size() &&
+           s.substr(0, prefix.size()) == prefix;
+}
+
+starts_with("hello world", "hello");
+std::string s = "hello world";
+starts_with(s, "hello");
+starts_with(c_string_ptr, "hello");
+
+// WARNING — view doesn't own
+std::string_view bad() {
+    std::string local = "hi";
+    return local;          // local dies; returned view dangles — UB
+}`}</Code>
+            <Callout kind="info" title="C++17">
+              <Kbd>std::string_view</Kbd> is the answer to 'how do I take a string parameter efficiently.' Replaces both <Kbd>(const std::string&)</Kbd> and <Kbd>(const char*)</Kbd> overloads with one. But the view doesn't keep its source alive — lifetime is YOUR responsibility.
+            </Callout>
+            {stackData?.library && <Callout kind="you" title={`FOR YOUR STACK · ${stackLabel}`}>{stackData.library}</Callout>}
+            {QUIZZES.stl.map(q => <Quiz key={q.qid} quiz={q} />)}
+          </>
+        );
+
+      case 7:
+        return (
+          <>
+            <H2 num="◇ C++11">C++11 — the revolution</H2>
+            <P>
+              2011 was the biggest single change in C++ history. The language as practiced today started here.
+            </P>
+            <Code id="cpp11">{`// auto — type deduction
+auto x = 42;                     // int
+auto p = std::make_unique<W>();  // std::unique_ptr<W>
+
+// range-for
+for (auto& x : container) { /* ... */ }
+
+// Lambdas
+auto greet = [](const std::string& name) {
+    return "Hello, " + name;
+};
+
+// Smart pointers (real)
+std::unique_ptr<W> w = std::make_unique<W>(args);   // C++14 for make_unique
+std::shared_ptr<W> s = std::make_shared<W>(args);
+
+// Move semantics + rvalue refs
+std::vector<T> a = build();
+std::vector<T> b = std::move(a);   // O(1) instead of O(n)
+
+// nullptr (typed)
+W* p = nullptr;                    // not (void*)0, not NULL
+
+// noexcept
+void f() noexcept;                 // this won't throw
+
+// constexpr (initial — expanded in later standards)
+constexpr int sq(int x) { return x * x; }
+
+// Variadic templates
+template<typename... Args> void log(Args&&... args);
+
+// Uniform initialization
+Widget w {};
+std::vector v {1, 2, 3};`}</Code>
+            <H2 num="◇ C++17">C++17 — quality of life</H2>
+            <Code id="cpp17">{`// Structured bindings
+auto [name, age] = get_person();
+for (auto& [key, value] : map) { /* ... */ }
+
+// std::optional / variant / any
+std::optional<int> parse(std::string_view s);
+auto result = parse("42");
+if (result) use(*result);
+
+std::variant<int, std::string> v = "hello";
+std::visit([](auto& x) { std::cout << x; }, v);
+
+// if-init
+if (auto it = map.find(key); it != map.end()) {
+    use(it->second);
+}   // 'it' scope ends here
+
+// if constexpr — compile-time branching
+template<typename T>
+void f(T x) {
+    if constexpr (std::is_integral_v<T>) {
+        // ... int path
+    } else {
+        // ... other path
+    }
+}
+
+// std::string_view, std::filesystem, parallel STL
+// Fold expressions
+template<typename... Args>
+auto sum(Args... args) { return (args + ...); }`}</Code>
+            <H2 num="◇ C++20">C++20 — the Big Four</H2>
+            <P>
+              Concepts (constraint templates cleanly), Ranges (composable algorithms + views), Modules (the import replacement for #include), Coroutines (suspend/resume functions). Plus: three-way comparison <Kbd>&lt;=&gt;</Kbd>, designated initializers, <Kbd>std::format</Kbd>, <Kbd>std::span</Kbd>, <Kbd>consteval</Kbd>.
+            </P>
+            <Code id="cpp20">{`// Concepts
+template<std::integral T> T add(T a, T b) { return a + b; }
+
+// Ranges + views
+auto squares = vec
+    | std::views::filter([](int x) { return x > 0; })
+    | std::views::transform([](int x) { return x * x; });
+
+// Three-way comparison (spaceship)
+struct Point {
+    int x, y;
+    auto operator<=>(const Point&) const = default;
+    // Gets ==, !=, <, <=, >, >= all defaulted from this one operator
+};
+
+// Designated initializers
+struct Config { int port; std::string host; };
+Config c { .port = 8080, .host = "localhost" };
+
+// std::format
+std::string s = std::format("hello {}, count={}", name, n);
+
+// std::span — non-owning view of contiguous sequence
+void process(std::span<int> data) { /* ... */ }
+
+// consteval — must be compile time
+consteval int abs_ct(int x) { return x < 0 ? -x : x; }
+
+// using enum
+enum class Color { Red, Green, Blue };
+void demo() {
+    using enum Color;
+    auto c = Red;           // no Color:: prefix
+}`}</Code>
+            <H2 num="◇ C++23">C++23 — filling gaps</H2>
+            <Code id="cpp23">{`// std::expected — Result-style errors
+std::expected<int, ParseError> parse(std::string_view s) {
+    if (bad) return std::unexpected(ParseError{s});
+    return 42;
+}
+
+auto n = parse("42")
+    .and_then(validate)            // monadic chain
+    .or_else(fallback);
+
+// std::print / std::println
+std::println("hello {}, count={}", name, n);
+
+// Multidimensional subscript
+template<typename T> class Grid {
+public:
+    T& operator[](size_t r, size_t c) { return data_[r * cols_ + c]; }
+};
+grid[i, j] = 42;                   // C++23 — was grid[i][j]
+
+// std::flat_map — sorted vector under the hood
+std::flat_map<std::string, int> counts;
+
+// 'this' as explicit object parameter
+struct Widget {
+    void method(this Widget& self) { /* ... */ }
+    void method(this const Widget& self) { /* ... */ }
+};
+
+// if consteval — runtime vs compile-time branching
+constexpr int f(int x) {
+    if consteval {
+        // compile-time path
+    } else {
+        // runtime path
+    }
+}`}</Code>
+            <H2 num="◇ C++26">C++26 — reflection, contracts, async</H2>
+            <P>
+              <strong>Finalized March 28, 2026.</strong> The most significant C++ update since C++20. Three landmark features:
+            </P>
+            <Code id="cpp26-reflection">{`// Static reflection (P2996) — Sutter's "decade-defining rocket engine"
+#include <experimental/reflection>
+
+struct Person { std::string name; int age; };
+
+template<typename T>
+void print_fields(const T& obj) {
+    constexpr auto info = ^T;                  // reflect the type
+    constexpr auto members = std::meta::nonstatic_data_members_of(info);
+
+    [: members:].each([&](auto member) {
+        std::cout << std::meta::name_of(member) << " = "
+                  << obj.[:member:] << "\\n";
+    });
+}
+
+print_fields(Person{"Alice", 30});
+// Output:
+//   name = Alice
+//   age = 30
+// Generated at compile time — no runtime cost`}</Code>
+            <Code id="cpp26-contracts">{`// Contracts (P2900) — pre/post/assert
+int divide(int a, int b)
+    pre(b != 0)                     // precondition — checked on entry
+    post(r : r * b == a)            // postcondition — r is the return value
+{
+    return a / b;
+}
+
+void process(std::vector<int>& v) {
+    contract_assert(!v.empty());   // assertion mid-function
+    // ...
+}`}</Code>
+            <Code id="cpp26-senders">{`// std::execution senders/receivers (P2300) — composable async
+#include <execution>
+
+namespace ex = std::execution;
+
+auto pipeline = ex::schedule(thread_pool_sched)
+              | ex::then([] { return load_file("a"); })
+              | ex::then(parse)
+              | ex::then(validate)
+              | ex::then([](auto result) { save(result); });
+
+ex::sync_wait(pipeline);
+
+// Three result channels: value, error, stopped (cancellation)
+// Schedulers determine WHERE work runs — swap thread pool / GPU stream`}</Code>
+            <Callout kind="cite" title="C++26 STATUS">
+              C++26 was officially shipped by WG21 on March 28, 2026 in London. Final draft: N5046. As of April 2026, GCC 16.1 supports most C++26 features. Clang has C++23 + partial C++26 via <Kbd>-std=c++2c</Kbd>. Sources: Herb Sutter's blog (herbsutter.com), InfoQ "C++26: Reflection, Memory Safety, Contracts, and a New Async Model" (April 2026), Wikipedia C++26.
+            </Callout>
+            {QUIZZES.modern.map(q => <Quiz key={q.qid} quiz={q} />)}
+          </>
+        );
+
+      case 8:
+        return (
+          <>
+            <H2 num="◇ LIB">A working library of C++ patterns</H2>
+            <P>
+              Eight categories of production-grade C++ idioms. Every snippet has a copy button and a 'try in godbolt' link — paste into Compiler Explorer to inspect the assembly.
+            </P>
+            <P>
+              All MIT-licensed. Copy, modify, ship.
+            </P>
+            <LibraryViewer />
+            <H2 num="◇ DOWNLOAD">Take the library with you</H2>
+            <div className="flex flex-wrap gap-2 my-3">
+              <button onClick={exportLibrary} className="flex items-center gap-2 border border-purple-400 text-purple-300 px-4 py-2 text-[13px] hover:bg-purple-400/10" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+                <Library size={14} /> Download library.md
+              </button>
+            </div>
+            <H2 num="◇ DONT">Anti-patterns — things to avoid</H2>
+            <div className="grid gap-2 my-3">
+              {ANTIPATTERNS.map(a => (
+                <Callout key={a.name} kind="dont" title={a.name}>{a.reason}</Callout>
+              ))}
+            </div>
+            <Callout kind="cite" title="INSPIRATION">
+              Library patterns drawn from libstdc++ + libc++ source, Boost, Folly (Facebook), abseil (Google), Eric Niebler's range-v3, the C++ Core Guidelines (Stroustrup + Sutter), and Klaus Iglberger's 'C++ Software Design.'
+            </Callout>
+          </>
+        );
+
+      case 9:
+        return (
+          <>
+            <H2 num="◇ LIVE">Real C++ execution in your browser</H2>
+            <P>
+              The sandbox uses <strong>JSCPP</strong> — a JavaScript C++ interpreter loaded from jsdelivr (MIT, ~1 MB). Supports iostream, classes, templates (basic), STL containers (vector, string), algorithms (sort), lambdas, smart pointers, structs.
+            </P>
+            <P>
+              <strong>Limitations:</strong> JSCPP is a strict subset interpreter. Concepts (C++20), ranges, coroutines, modules, reflection (C++26), and the more esoteric corners of templates won't run. For full C++ install gcc/clang locally — or use <Kbd>godbolt.org</Kbd> (linked from every code block above) for a full compiler in the browser.
+            </P>
+            <Sandbox />
+            <Callout kind="cite" title="HOW IT WORKS">
+              JSCPP 2.0.9 by Felix Hao (github.com/felixhao28/JSCPP). Designed for MOOC use — strict, refuses to ignore UB the way some compilers do. Six progressive challenges from <em>Hello, World</em> through std::sort with a lambda. Each challenge has a fixed expected stdout; pass when matched exactly.
+            </Callout>
+            <Callout kind="tip" title="USE GODBOLT">
+              For anything beyond the basics: <Kbd>godbolt.org</Kbd> runs real GCC, Clang, MSVC across every standard (including C++26). Every code block in this atlas has a 'try in godbolt' link — clicking opens Compiler Explorer with the snippet pre-loaded.
+            </Callout>
+          </>
+        );
+
+      case 10:
+        return (
+          <>
+            <H2 num="◇ TRIAGE">Reading C++ errors</H2>
+            <P>
+              C++ errors are wordier than C errors. Read the FIRST error — later ones cascade. For templates, look for 'required from here' lines — they trace the instantiation chain. C++20 concepts reduce error wall length by 10-100x compared to pre-C++20 SFINAE.
+            </P>
+            <Troubleshooter />
+            <H2 num="◇ TOOLS">The C++ debugger's toolkit</H2>
+            <div className="grid gap-2 my-3 text-[13px]">
+              {[
+                { name: 'AddressSanitizer (ASAN)', what: "Compile with -fsanitize=address. Catches heap/stack buffer overflow, use-after-free, double-free, leaks. Best single tool in modern C++." },
+                { name: 'UndefinedBehaviorSanitizer (UBSAN)', what: "Compile with -fsanitize=undefined. Catches signed overflow, null deref, OOB shifts, misaligned access. Pair with ASAN." },
+                { name: 'ThreadSanitizer (TSAN)', what: "Compile with -fsanitize=thread. Catches data races. Indispensable for concurrent code." },
+                { name: 'gdb / lldb', what: "Interactive debugger. C++ symbol demangling automatic. STL pretty-printers make vec, map, smart_ptr inspection readable." },
+                { name: 'valgrind', what: "Slower than ASAN, doesn't need rebuild. helgrind for races, cachegrind for cache analysis, massif for heap profiling." },
+                { name: 'Compiler Explorer (godbolt.org)', what: "Best free tool for understanding what C++ code costs. Side-by-side assembly across compiler versions." },
+                { name: 'clang-tidy', what: "Static analysis. modernize-* checks suggest C++17/20 upgrades. bugprone-use-after-move + performance-* are gold. Run in CI." },
+                { name: 'clang-format', what: "Auto-format. .clang-format file in repo. LLVM, Google, Mozilla, WebKit, Microsoft styles built-in." },
+              ].map(t => (
+                <div key={t.name} className="border border-zinc-800 px-3 py-2">
+                  <div className="text-purple-300 text-[13px] font-medium" style={{ fontFamily: 'JetBrains Mono, monospace' }}>{t.name}</div>
+                  <div className="text-zinc-400 text-[12px] mt-1 leading-relaxed">{t.what}</div>
+                </div>
+              ))}
+            </div>
+          </>
+        );
+
+      case 11:
+        return (
+          <>
+            <H2 num="◇ PROGRESS">Where you are</H2>
+            <div className="grid grid-cols-3 gap-2 my-3">
+              <div className="border border-zinc-800 p-3 text-center">
+                <div className="text-purple-300 text-[28px] font-bold" style={{ fontFamily: 'Bricolage Grotesque, sans-serif' }}>{totalCorrect}</div>
+                <div className="text-zinc-500 text-[11px] uppercase tracking-widest" style={{ fontFamily: 'JetBrains Mono, monospace' }}>correct</div>
+              </div>
+              <div className="border border-zinc-800 p-3 text-center">
+                <div className="text-amber-300 text-[28px] font-bold" style={{ fontFamily: 'Bricolage Grotesque, sans-serif' }}>{missed.length}</div>
+                <div className="text-zinc-500 text-[11px] uppercase tracking-widest" style={{ fontFamily: 'JetBrains Mono, monospace' }}>missed</div>
+              </div>
+              <div className="border border-zinc-800 p-3 text-center">
+                <div className="text-zinc-300 text-[28px] font-bold" style={{ fontFamily: 'Bricolage Grotesque, sans-serif' }}>{totalAnswered}/{allQuizzes.length}</div>
+                <div className="text-zinc-500 text-[11px] uppercase tracking-widest" style={{ fontFamily: 'JetBrains Mono, monospace' }}>answered</div>
+              </div>
+            </div>
+            {missed.length > 0 && (
+              <>
+                <H2 num="◇ REVIEW">Worth a second look</H2>
+                <div className="space-y-2">
+                  {missed.map(q => (
+                    <div key={q.qid} className="border border-zinc-800 bg-zinc-900/30 p-3 text-[13px]">
+                      <div className="text-zinc-100 mb-1 whitespace-pre-wrap">{q.q}</div>
+                      <div className="text-purple-300 text-[12px]"><span className="text-zinc-500">Correct:</span> {q.opts[q.a]}</div>
+                      <div className="text-zinc-400 text-[12px] mt-1">{q.x}</div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+            <H2 num="◇ ROADMAP">A C++ reading roadmap</H2>
+            <P>
+              For your stack (<strong>{stackLabel || "—"}</strong>): {stackData?.spark || "pick a stack to personalize"}
+            </P>
+            <div className="grid gap-2 my-3 text-[13px]">
+              {[
+                { wk: 'Week 1-2', plan: "Stroustrup's 'A Tour of C++' (3rd ed, ~250 pages). Type every example into godbolt. Build a small CLI tool — argv parser, file processor — using std::string, std::vector, ranges." },
+                { wk: 'Week 3-4', plan: "Scott Meyers, 'Effective Modern C++' — chapters 1-4 (auto, smart pointers, rvalues). The way to internalize move semantics. Pair with Klaus Iglberger talks on YouTube." },
+                { wk: 'Week 5-6', plan: "C++ Core Guidelines (isocpp.github.io/CppCoreGuidelines) — read sections C (classes), F (functions), R (resource management). Apply to your week-1 project; refactor with sanitizers + clang-tidy." },
+                { wk: 'Week 7-9', plan: "Templates + concepts deep dive. Implement your own unique_ptr from scratch. Read libstdc++'s std::unique_ptr source. Build a small generic container. Watch Jason Turner's C++ Weekly archive." },
+                { wk: 'Week 10-12', plan: "STL deep dive. Implement vector, deque, simple hash map. Read the algorithm headers. Solve LeetCode/Codeforces problems using only STL." },
+                { wk: 'Week 13+', plan: "Pick a domain and read its idiomatic code. SQLite (C but its C++ ecosystem is huge). Folly. abseil. boost::asio for networking. range-v3 for ranges mastery. Subscribe to herbsutter.com for standards-committee depth." },
+              ].map(w => (
+                <div key={w.wk} className="border-l-2 border-purple-400 pl-3 py-1">
+                  <div className="text-purple-300 text-[12px] font-bold" style={{ fontFamily: 'JetBrains Mono, monospace' }}>{w.wk}</div>
+                  <div className="text-zinc-300 text-[12px] mt-0.5">{w.plan}</div>
+                </div>
+              ))}
+            </div>
+            <H2 num="◇ RES">Authoritative resources</H2>
+            <div className="grid gap-1.5 my-3 text-[13px]">
+              {RESOURCES.map(r => (
+                <div key={r.name} className="border border-zinc-800 px-3 py-2">
+                  <div className="flex items-start gap-2 flex-wrap">
+                    <span className="text-purple-300 text-[13px] font-medium">{r.name}</span>
+                    <span className="text-zinc-500 text-[10px] uppercase tracking-wider px-1.5 border border-zinc-700" style={{ fontFamily: 'JetBrains Mono, monospace' }}>{r.kind}</span>
+                  </div>
+                  <code className="text-teal-300 text-[11px] block mt-1" style={{ fontFamily: 'JetBrains Mono, monospace' }}>{r.url}</code>
+                  <div className="text-zinc-400 text-[12px] mt-1">{r.note}</div>
+                </div>
+              ))}
+            </div>
+            <H2 num="◇ EXPORT">Take it with you</H2>
+            <div className="flex flex-wrap gap-2 my-3">
+              <button onClick={exportCheatsheet} className="flex items-center gap-2 border border-purple-400 text-purple-300 px-4 py-2 text-[13px] hover:bg-purple-400/10" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+                <BookOpen size={14} /> Download cheatsheet.md
+              </button>
+              <button onClick={exportLibrary} className="flex items-center gap-2 border border-teal-400 text-teal-300 px-4 py-2 text-[13px] hover:bg-teal-400/10" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+                <Library size={14} /> Download library.md
+              </button>
+              <button onClick={copyAllCommands} className="flex items-center gap-2 border border-amber-300 text-amber-200 px-4 py-2 text-[13px] hover:bg-amber-300/10" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+                {copied === 'allcmds' ? <Check size={14} /> : <Copy size={14} />}
+                {copied === 'allcmds' ? 'copied!' : 'Copy all commands'}
+              </button>
+              <button onClick={() => { if (confirm('Reset all progress?')) { setCompleted(new Set()); setChecklist({}); setQuizState({}); setStack(null); setActiveSection(0); setShowOnboarding(true); } }} className="flex items-center gap-2 border border-zinc-700 text-zinc-400 px-4 py-2 text-[13px] hover:border-red-400 hover:text-red-300" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+                <RotateCcw size={14} /> Reset progress
+              </button>
+            </div>
+            {QUIZZES.atlas.map(q => <Quiz key={q.qid} quiz={q} />)}
+            <Callout kind="info" title="THE END (AND THE BEGINNING)">
+              C++ is the largest mainstream language by surface area. Mastery is decades. You've walked the standards timeline (C++98 → C++26), the build pipeline, references and value categories, RAII and the rule of 0/5, smart pointers, templates with concepts, the STL and ranges, every modern standard's marquee features, a working library of patterns, real execution, and the triage tree. Open a major C++ codebase — folly, abseil, RocksDB, LLVM — and start reading. Every page will teach you something.
+            </Callout>
+          </>
+        );
+
+      default: return null;
+    }
+  };
+
+  const sec = SECTIONS[activeSection];
+
+  return (
+    <div className="min-h-screen bg-black text-zinc-300" style={{ fontFamily: 'Manrope, sans-serif' }}>
+      {showOnboarding && <Onboarding />}
+      {cmdOpen && <CommandPalette />}
+      <TermPopover />
+
+      {/* HEADER */}
+      <header className="border-b border-zinc-800 sticky top-0 bg-black/90 backdrop-blur-sm z-30">
+        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="text-purple-400 text-[28px] leading-none font-bold shrink-0" style={{ fontFamily: 'Bricolage Grotesque, sans-serif' }}>∷</div>
+            <div className="min-w-0">
+              <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500" style={{ fontFamily: 'JetBrains Mono, monospace' }}>ATLAS</div>
+              <div className="text-zinc-100 text-[16px] font-bold leading-tight truncate" style={{ fontFamily: 'Bricolage Grotesque, sans-serif' }}>C++</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {stack && (
+              <button onClick={() => setShowOnboarding(true)} className="hidden sm:flex items-center gap-1.5 border border-amber-300/40 text-amber-200 px-2 py-1 text-[11px] hover:bg-amber-300/10" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+                {STACKS.find(s => s.id === stack)?.icon} {stackLabel}
+              </button>
+            )}
+            <button onClick={() => setCmdOpen(true)} className="flex items-center gap-1.5 border border-zinc-700 text-zinc-400 px-2 py-1 text-[11px] hover:border-purple-400 hover:text-purple-300" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+              <Search size={12} /> <span className="hidden sm:inline">search</span>
+              <kbd className="hidden sm:inline border border-zinc-700 px-1 text-[9px] ml-0.5">⌘K</kbd>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* NAV STRIP */}
+      <nav className="border-b border-zinc-800 bg-zinc-950 sticky top-[57px] z-20">
+        <div className="max-w-4xl mx-auto px-4 py-2 flex gap-1 overflow-x-auto">
+          {SECTIONS.map((s, i) => {
+            const Icon = s.icon;
+            const isActive = i === activeSection;
+            const isDone = completed.has(i);
+            return (
+              <button key={s.id} onClick={() => setActiveSection(i)}
+                className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] border transition-colors whitespace-nowrap ${
+                  isActive ? 'border-purple-400 bg-purple-400/10 text-purple-300' :
+                  isDone ? 'border-zinc-700 text-zinc-400' :
+                  'border-zinc-800 text-zinc-500 hover:text-zinc-300'
+                }`}
+                style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+                <span className="text-[9px] opacity-60">{s.num}</span>
+                <Icon size={12} />
+                <span>{s.label}</span>
+                {isDone && <Check size={11} className="text-purple-400" strokeWidth={3} />}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+
+      {/* MAIN */}
+      <main className="max-w-4xl mx-auto px-4 py-6">
+        <div className="mb-5 pb-4 border-b border-zinc-900">
+          <div className="text-[10px] uppercase tracking-[0.3em] text-purple-400 mb-1" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+            CHAPTER {sec.num}
+          </div>
+          <h1 className="text-zinc-100 text-[32px] font-bold leading-tight mb-1" style={{ fontFamily: 'Bricolage Grotesque, sans-serif' }}>
+            {sec.label}
+          </h1>
+          <p className="text-zinc-500 text-[14px]">{sec.sub}</p>
+        </div>
+
+        {renderSection()}
+
+        {/* FOOTER NAV */}
+        <div className="mt-10 pt-5 border-t border-zinc-900 flex items-center justify-between gap-2 flex-wrap">
+          <button onClick={() => setActiveSection(Math.max(0, activeSection - 1))} disabled={activeSection === 0}
+            className="flex items-center gap-1.5 text-[12px] text-zinc-400 hover:text-purple-300 disabled:opacity-30 disabled:cursor-not-allowed" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+            <ChevronLeft size={14} /> {activeSection > 0 ? SECTIONS[activeSection - 1].label : 'Start'}
+          </button>
+          <button onClick={() => markComplete(activeSection)} disabled={completed.has(activeSection)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] border transition-colors ${
+              completed.has(activeSection) ? 'border-purple-400 text-purple-300 bg-purple-400/10 cursor-not-allowed' :
+              'border-zinc-700 text-zinc-400 hover:border-purple-400 hover:text-purple-300'
+            }`} style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+            <Check size={12} /> {completed.has(activeSection) ? 'COMPLETE' : 'mark complete'}
+          </button>
+          <button onClick={() => setActiveSection(Math.min(SECTIONS.length - 1, activeSection + 1))} disabled={activeSection === SECTIONS.length - 1}
+            className="flex items-center gap-1.5 text-[12px] text-zinc-400 hover:text-purple-300 disabled:opacity-30 disabled:cursor-not-allowed" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+            {activeSection < SECTIONS.length - 1 ? SECTIONS[activeSection + 1].label : 'End'} <ChevronRight size={14} />
+          </button>
+        </div>
+
+        <div className="mt-12 pb-6 text-center">
+          <div className="text-zinc-700 text-[10px] uppercase tracking-[0.4em]" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+            ∷ · c++ atlas · grounded in core guidelines + a tour of c++ + cppreference + ISO C++26
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
