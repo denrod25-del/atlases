@@ -12,6 +12,7 @@ const CAtlas          = lazy(() => import('./atlases/c-atlas.jsx'));
 const CppAtlas        = lazy(() => import('./atlases/cpp-atlas.jsx'));
 const DbAtlas         = lazy(() => import('./atlases/db-atlas.jsx'));
 const NetAtlas        = lazy(() => import('./atlases/net-atlas.jsx'));
+const LinuxAtlas      = lazy(() => import('./atlases/linux-atlas.jsx'));
 
 const Loading = () => (
   <div className="min-h-screen flex items-center justify-center bg-black text-zinc-500">
@@ -35,6 +36,7 @@ export default function App() {
         <Route path="/cpp"        element={<CppAtlas />} />
         <Route path="/db"         element={<DbAtlas />} />
         <Route path="/net"        element={<NetAtlas />} />
+        <Route path="/linux"      element={<LinuxAtlas />} />
         <Route path="*"           element={<Landing />} />
       </Routes>
     </Suspense>

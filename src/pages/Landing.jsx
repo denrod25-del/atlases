@@ -24,6 +24,16 @@ const ATLASES = [
     chapters: 12,
   },
   {
+    path: '/linux',
+    glyph: '#',
+    name: 'Linux',
+    title: 'Linux',
+    color: '#4ade80',
+    accent: '#fcd34d',
+    sub: 'Shell, filesystem, processes, systemd. Real mini-shell sandbox.',
+    chapters: 12,
+  },
+  {
     path: '/python',
     glyph: 'π',
     name: 'Python',
