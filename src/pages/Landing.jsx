@@ -14,6 +14,16 @@ const ATLASES = [
     chapters: 12,
   },
   {
+    path: '/net',
+    glyph: '⇌',
+    name: 'Net',
+    title: 'Networking',
+    color: '#67e8f9',
+    accent: '#fb923c',
+    sub: 'DNS, TLS, HTTP, CDN. Real DNS + HTTP sandbox.',
+    chapters: 12,
+  },
+  {
     path: '/python',
     glyph: 'π',
     name: 'Python',
