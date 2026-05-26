@@ -64,6 +64,16 @@ const ATLASES = [
     chapters: 12,
   },
   {
+    path: '/ai',
+    glyph: '⊛',
+    name: 'AI/LLM',
+    title: 'AI/LLM Engineering',
+    color: '#fb923c',
+    accent: '#5eead4',
+    sub: 'Tokens, RAG, agents, evals. Real tokenizer + cost calc + eval runner sandbox.',
+    chapters: 12,
+  },
+  {
     path: '/python',
     glyph: 'π',
     name: 'Python',
