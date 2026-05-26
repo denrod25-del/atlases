@@ -14,6 +14,8 @@ const DbAtlas         = lazy(() => import('./atlases/db-atlas.jsx'));
 const NetAtlas        = lazy(() => import('./atlases/net-atlas.jsx'));
 const LinuxAtlas      = lazy(() => import('./atlases/linux-atlas.jsx'));
 const CryptoAtlas     = lazy(() => import('./atlases/crypto-atlas.jsx'));
+const CompilersAtlas  = lazy(() => import('./atlases/compilers-atlas.jsx'));
+const ObservabilityAtlas = lazy(() => import('./atlases/observability-atlas.jsx'));
 
 const Loading = () => (
   <div className="min-h-screen flex items-center justify-center bg-black text-zinc-500">
@@ -39,6 +41,8 @@ export default function App() {
         <Route path="/net"        element={<NetAtlas />} />
         <Route path="/linux"      element={<LinuxAtlas />} />
         <Route path="/crypto"     element={<CryptoAtlas />} />
+        <Route path="/compilers"  element={<CompilersAtlas />} />
+        <Route path="/observability" element={<ObservabilityAtlas />} />
         <Route path="*"           element={<Landing />} />
       </Routes>
     </Suspense>
