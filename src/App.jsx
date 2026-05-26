@@ -17,6 +17,7 @@ const CryptoAtlas     = lazy(() => import('./atlases/crypto-atlas.jsx'));
 const CompilersAtlas  = lazy(() => import('./atlases/compilers-atlas.jsx'));
 const ObservabilityAtlas = lazy(() => import('./atlases/observability-atlas.jsx'));
 const AIAtlas = lazy(() => import('./atlases/ai-atlas.jsx'));
+const FiveMAtlas = lazy(() => import('./atlases/fivem-atlas.jsx'));
 
 const Loading = () => (
   <div className="min-h-screen flex items-center justify-center bg-black text-zinc-500">
@@ -45,6 +46,7 @@ export default function App() {
         <Route path="/compilers"  element={<CompilersAtlas />} />
         <Route path="/observability" element={<ObservabilityAtlas />} />
         <Route path="/ai" element={<AIAtlas />} />
+        <Route path="/fivem" element={<FiveMAtlas />} />
         <Route path="*"           element={<Landing />} />
       </Routes>
     </Suspense>

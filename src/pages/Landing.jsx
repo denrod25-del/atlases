@@ -74,6 +74,16 @@ const ATLASES = [
     chapters: 12,
   },
   {
+    path: '/fivem',
+    glyph: '◫',
+    name: 'FiveM/Lua',
+    title: 'FiveM / Lua / QBCore',
+    color: '#f9a8d4',
+    accent: '#22d3ee',
+    sub: 'Server/client split, events, QBCore→QBox, NUI. Real Lua interpreter + event flow sim + fxmanifest builder.',
+    chapters: 12,
+  },
+  {
     path: '/python',
     glyph: 'π',
     name: 'Python',
