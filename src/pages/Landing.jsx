@@ -34,6 +34,16 @@ const ATLASES = [
     chapters: 12,
   },
   {
+    path: '/crypto',
+    glyph: '⊕',
+    name: 'Crypto',
+    title: 'Cryptography',
+    color: '#6ee7b7',
+    accent: '#e879f9',
+    sub: 'Hashes, AES, Ed25519, post-quantum. Real SubtleCrypto sandbox.',
+    chapters: 12,
+  },
+  {
     path: '/python',
     glyph: 'π',
     name: 'Python',
