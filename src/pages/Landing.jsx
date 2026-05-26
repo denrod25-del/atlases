@@ -84,6 +84,16 @@ const ATLASES = [
     chapters: 12,
   },
   {
+    path: '/encoding',
+    glyph: '◰',
+    name: 'Encoding',
+    title: 'Encoding / Bytes / Wire Formats',
+    color: '#fde68a',
+    accent: '#38bdf8',
+    sub: 'ASCII, UTF-8, base64, hex, URL encoding. Real multi-converter + UTF-8 bit visualizer + mojibake demo.',
+    chapters: 12,
+  },
+  {
     path: '/python',
     glyph: 'π',
     name: 'Python',
