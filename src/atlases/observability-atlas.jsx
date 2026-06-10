@@ -408,7 +408,7 @@ const PERSONALIZED = {
     library: "Data: Kafka/streaming patterns, batch correlation IDs, lag dashboards, data freshness SLOs.",
   },
   ai: {
-    spark: "AI/LLM: token usage as the primary metric. Prompt latency. Eval scores. Agent traces — each tool call as a span. OpenTelemetry GenAI semantic conventions stabilized in 2025. Use Arize Phoenix or Honeycomb for traces.",
+    spark: "AI/LLM: token usage as the primary metric. Prompt latency. Eval scores. Agent traces — each tool call as a span. OpenTelemetry GenAI semantic conventions are still experimental but already the de-facto standard. Use Arize Phoenix or Honeycomb for traces.",
     pillars: "AI: traces dominate — agent workflows are deeply nested span trees. Metrics for token costs and latencies. Logs for prompt/completion content (with redaction). Profiling for inference time on self-hosted models.",
     metrics: "AI: tokens per request (in/out), cost per request, latency by model+prompt-class, eval scores over time, cache hit rate. Histogram for latency by model. Counter for tokens (per-tenant for cost).",
     traces: "AI: each LLM call = a span. Each tool call = a span. Multi-agent = nested span trees. OpenInference (Arize) or OpenLLMetry (Traceloop) for instrumentation. OTel multi-agent conventions still experimental.",

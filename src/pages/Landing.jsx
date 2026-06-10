@@ -186,7 +186,7 @@ export default function Landing() {
           <span className="text-zinc-500">Build the intuition.</span>
         </h1>
         <p className="text-zinc-400 text-[16px] sm:text-[18px] leading-relaxed max-w-2xl">
-          Eight long-form interactive guides — each one a 12-chapter dive with real sandboxes,
+          Sixteen long-form interactive guides — each one a 12-chapter dive with real sandboxes,
           curated snippet libraries, troubleshooting trees, and the kind of practical detail
           you actually need to ship.
         </p>

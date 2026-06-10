@@ -14,7 +14,7 @@ import {
    ═══════════════════════════════════════════════════════════════ */
 
 const SECTIONS = [
-  { id: 'origin', label: 'Origin', icon: Compass, num: '01', sub: "FiveM history, CFX.re, Rockstar acquisition, QBCore -> QBox split, May 2026 state." },
+  { id: 'origin', label: 'Origin', icon: Compass, num: '01', sub: "FiveM history, CFX.re, Rockstar acquisition, QBCore -> QBox split, June 2026 state." },
   { id: 'architecture', label: 'Architecture', icon: Layers, num: '02', sub: "Server/client split, resources, the security boundary, OneSync, sessionhost." },
   { id: 'lua', label: 'Lua', icon: CodeIcon, num: '03', sub: "Syntax, tables, metatables, coroutines (Citizen.Wait), FiveM-specific Lua patterns." },
   { id: 'events', label: 'Events', icon: MessageSquare, num: '04', sub: "RegisterNetEvent, TriggerServerEvent, TriggerClientEvent. Server-authority pattern." },
@@ -62,7 +62,7 @@ const GLOSSARY = {
   QBox: "Modern fork of QBCore (qbox-project / qbx_core). Actively maintained by former QBCore contributors. Built around the ox_ ecosystem. Lua 5.4. Strict server-authority. Backwards-compatible with most QBCore resources. The 2026 recommendation for new servers.",
   ESX: "Older roleplay framework (es_extended), launched ~2017. Mature, battle-tested, huge script library. Still active. Different player object structure than QBCore/QBox — scripts must target one or the other (or both via wrappers).",
   "qbx_core": "QBox's core resource. Replaces qb-core. Provides the Player object, money, jobs, gangs, inventory wrappers, metadata. The framework heart.",
-  "ox_lib": "Utility library from the overextended team. UI primitives (menus, dialogs, input forms), caching, callbacks, math helpers, server-authority helpers. Bundled with QBox; usable standalone.",
+  "ox_lib": "Utility library originally from the Overextended team (now maintained by CommunityOx). UI primitives (menus, dialogs, input forms), caching, callbacks, math helpers, server-authority helpers. Bundled with QBox; usable standalone.",
   "ox_inventory": "Modern inventory system. Weight-based, slot-based, supports multiple inventory types (player, vehicle, stash, drops). Standard in QBox; works with QBCore via bridge.",
   "ox_target": "Targeting/interaction system. Eye/cursor-based interactions with entities (players, vehicles, peds, props). The 2026 standard for context interactions (E-to-do-X menus).",
   "Player object": "Framework's representation of an online player. Contains identifier, character data, money, job, inventory wrappers, metadata. QBCore: QBCore.Functions.GetPlayer(source). QBox: exports.qbx_core:GetPlayer(source). The handle for all per-player logic.",
@@ -105,7 +105,7 @@ const QUIZZES = {
       q: "What's the QBCore vs QBox situation in 2026?",
       opts: [
         "Same thing",
-        "QBCore is the older framework (~2020) — huge script ecosystem but development largely stalled. QBox is the community-driven successor (qbox-project, qbx_core), built on ox_lib + ox_inventory + oxmysql, Lua 5.4, mostly backwards compatible. May 2026 recommendation: QBox for new servers.",
+        "QBCore is the older framework (~2020) — huge script ecosystem but development largely stalled. QBox is the community-driven successor (qbox-project, qbx_core), built on ox_lib + ox_inventory + oxmysql, Lua 5.4, mostly backwards compatible. June 2026 recommendation: QBox for new servers.",
         "QBox is dead"
       ],
       a: 1,
@@ -288,7 +288,7 @@ const QUIZZES = {
 
 const COMPARISONS = {
   frameworks_2026: {
-    title: 'FiveM frameworks (May 2026)',
+    title: 'FiveM frameworks (June 2026)',
     headers: ['Framework', 'Status', 'Best for', 'Notes'],
     rows: [
       ['ESX (es_extended)', 'Active, mature', "Servers with large existing ESX script libraries", "Oldest framework (~2017). Different player object than QB family. Battle-tested."],
@@ -387,10 +387,10 @@ const RESOURCES = [
   { name: "Cfx.re Forums", url: 'forum.cfx.re', note: "Official community forums. Server owners discussing issues, devs sharing resources, support threads. Search before posting — many issues have answers buried in 2019-2023 threads.", kind: 'community' },
   { name: "QBox Documentation", url: 'docs.qbox.re', note: "QBox framework docs. Server install, core API, ox_ ecosystem integration, migration from QBCore. The 2026 reference if you're on QBox.", kind: 'reference' },
   { name: "QBCore Documentation", url: 'docs.qbcore.org', note: "QBCore docs. Still useful for QBCore servers; many concepts translate to QBox. Note: development largely stalled, treat as reference for the framework as-is.", kind: 'reference' },
-  { name: "Overextended (ox_lib + friends)", url: 'overextended.dev', note: "Documentation hub for ox_lib, ox_inventory, oxmysql, ox_target. The modern FiveM ecosystem. Read these docs even if you're on QBCore — many resources use ox_lib regardless of framework.", kind: 'reference' },
+  { name: "Overextended docs (ox_lib + friends)", url: 'overextended.dev', note: "Documentation hub for ox_lib, ox_inventory, oxmysql, ox_target. The modern FiveM ecosystem. Read these docs even if you're on QBCore — many resources use ox_lib regardless of framework. Note: the original Overextended org wound down; the resources are now maintained by CommunityOx.", kind: 'reference' },
   { name: "FiveM GitHub (citizenfx/fivem)", url: 'github.com/citizenfx/fivem', note: "Source repo for FiveM itself. Issues, pull requests, releases. Useful for tracking platform changes and known bugs.", kind: 'reference' },
   { name: "QBox GitHub (qbox-project)", url: 'github.com/qbox-project', note: "Org for qbx_core and related resources. Issues, releases, migration guides. The active development center.", kind: 'reference' },
-  { name: "Overextended GitHub (overextended)", url: 'github.com/overextended', note: "Org for ox_lib, ox_inventory, oxmysql, ox_target. Issues, releases, examples. Active and well-maintained.", kind: 'reference' },
+  { name: "CommunityOx GitHub (communityox)", url: 'github.com/communityox', note: "Current home of ox_lib, ox_inventory, oxmysql, ox_target maintenance after the original Overextended org wound down. Issues, releases, examples.", kind: 'reference' },
   { name: "Lua 5.4 Reference Manual", url: 'lua.org/manual/5.4/', note: "Official Lua docs. Language reference. FiveM uses Lua 5.4 since 2024. Read sections on tables, metatables, coroutines — they're foundational.", kind: 'reference' },
   { name: "Roleplay Ready (YouTube)", url: 'youtube.com/@RoleplayReady', note: "Tutorial channel covering FiveM server setup, QBCore/QBox installation, common scripting patterns. Solid for visual learners.", kind: 'tutorial' },
   { name: "Cfx.re Discord", url: 'discord.gg/fivem', note: "Official Discord. Real-time help, development channels, framework-specific channels. Where most active troubleshooting happens in 2026.", kind: 'community' },
@@ -3366,7 +3366,7 @@ end)`,
   /* ─── Export helpers ─── */
   const exportCheatsheet = () => {
     let md = "# FiveM / Lua / QBCore Atlas — Cheatsheet\n\n";
-    md += "## Frameworks (May 2026)\n\n| Framework | Status | Best for | Notes |\n|---|---|---|---|\n";
+    md += "## Frameworks (June 2026)\n\n| Framework | Status | Best for | Notes |\n|---|---|---|---|\n";
     COMPARISONS.frameworks_2026.rows.forEach(r => { md += `| ${r[0]} | ${r[1]} | ${r[2]} | ${r[3]} |\n`; });
     md += "\n## Server vs client\n\n| Concern | Server | Client | Why |\n|---|---|---|---|\n";
     COMPARISONS.server_vs_client.rows.forEach(r => { md += `| ${r[0]} | ${r[1]} | ${r[2]} | ${r[3]} |\n`; });
@@ -3537,10 +3537,10 @@ end)`,
             </P>
             <H2 num="◇ 2025-2026">QBox and the ox_ ecosystem</H2>
             <P>
-              Former QBCore contributors forked the project as <Term>QBox</Term> (qbox-project, qbx_core). Goals: address performance, security, code quality. They built on the <Term name="ox_lib">overextended</Term> ecosystem — ox_lib (utilities, UI), ox_inventory (inventory), oxmysql (DB), ox_target (interactions). Lua 5.4. Strict server-authority. Modular. Backwards-compatible with most QBCore resources.
+              Former QBCore contributors forked the project as <Term>QBox</Term> (qbox-project, qbx_core). Goals: address performance, security, code quality. They built on the <Term name="ox_lib">Overextended</Term> ecosystem — ox_lib (utilities, UI), ox_inventory (inventory), oxmysql (DB), ox_target (interactions) — now maintained by CommunityOx after the original org wound down. Lua 5.4. Strict server-authority. Modular. Backwards-compatible with most QBCore resources.
             </P>
             <P>
-              May 2026: QBox is the recommended framework for new servers. QBCore still has the biggest script ecosystem and many production servers still run on it (Cle's Claw World RP included). Migration QBCore → QBox is a real ongoing trend; not necessary, but worth planning.
+              June 2026: QBox is the recommended framework for new servers. QBCore still has the biggest script ecosystem and many production servers still run on it (Cle's Claw World RP included). Migration QBCore → QBox is a real ongoing trend; not necessary, but worth planning.
             </P>
             <ComparisonTable data={COMPARISONS.frameworks_2026} />
             <div className="grid gap-2 my-3">
@@ -4329,7 +4329,7 @@ async function buyItem(itemId, count) {
 
         <div className="mt-12 pb-6 text-center">
           <div className="text-zinc-700 text-[10px] uppercase tracking-[0.4em]" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
-            ◫ · fivem atlas · current May 2026 · source = identity. validate the payload.
+            ◫ · fivem atlas · current June 2026 · source = identity. validate the payload.
           </div>
         </div>
       </main>
