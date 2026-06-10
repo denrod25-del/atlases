@@ -1660,7 +1660,7 @@ x is some_sentinel       # ✓ for unique-marker objects
 
 # NEVER:
 x is 1                    # implementation-defined; CPython caches small ints, others don't
-name is "Cle"            # SyntaxWarning in 3.8+ — don't do this`}</Code>
+name is "Ada"            # SyntaxWarning in 3.8+ — don't do this`}</Code>
             <Callout kind="warn" title="PEP 8 RULE">
               For None checks, always: <Kbd>if x is None:</Kbd>. Not <Kbd>if x == None:</Kbd>. Faster, clearer, and avoids __eq__ overrides that could lie.
             </Callout>
@@ -1708,8 +1708,8 @@ s[-1]               # '🐍' (negative indexing)
 s[:3]               # 'hél' (slicing)
 
 # F-strings (3.6+)
-name, age = "Cle", 30
-f"{name} is {age}"           # 'Cle is 30'
+name, age = "Ada", 30
+f"{name} is {age}"           # 'Ada is 30'
 f"{age = }"                  # 'age = 30' (debug style, 3.8+)
 f"{value:.2f}"               # format spec — 2 decimal places
 f"{value:>10}"               # right-aligned in 10-char field
@@ -1728,9 +1728,9 @@ f"{value:>10}"               # right-aligned in 10-char field
 def greet(name: str, greeting: str = "Hello") -> str:
     return f"{greeting}, {name}!"
 
-greet("Cle")                          # "Hello, Cle!"
-greet("Cle", "Howdy")                 # "Howdy, Cle!"
-greet(name="Cle", greeting="Hi")      # keyword args
+greet("Ada")                          # "Hello, Ada!"
+greet("Ada", "Howdy")                 # "Howdy, Ada!"
+greet(name="Ada", greeting="Hi")      # keyword args
 
 # Multiple return values (actually a tuple)
 def divmod_(a, b):
@@ -1764,7 +1764,7 @@ sum_all()                        # 0
 # **kwargs collects extra keyword args into a dict
 def make_user(**fields):
     return fields
-make_user(name="Cle", age=30)    # {'name': 'Cle', 'age': 30}
+make_user(name="Ada", age=30)    # {'name': 'Ada', 'age': 30}
 
 # Both together
 def fn(required, *args, **kwargs):
@@ -2041,9 +2041,9 @@ heapq.nlargest(5, iterable)           # top 5 efficiently`}</Code>
     def greet(self) -> str:
         return f"Hi, I'm {self.name}"
 
-u = User("Cle", 30)
-u.greet()                  # "Hi, I'm Cle"
-u.name                     # "Cle" — instance attr
+u = User("Ada", 30)
+u.greet()                  # "Hi, I'm Ada"
+u.name                     # "Ada" — instance attr
 u.species                  # "homo sapiens" — falls back to class attr
 User.species               # access on class works too`}</Code>
             <P>
@@ -2119,9 +2119,9 @@ class User:
     tags: list[str] = field(default_factory=list)    # mutable defaults — use factory!
 
 # Auto-generated: __init__, __repr__, __eq__
-u = User("Cle", 30)
-print(u)                          # User(name='Cle', age=30, tags=[])
-u == User("Cle", 30)              # True
+u = User("Ada", 30)
+print(u)                          # User(name='Ada', age=30, tags=[])
+u == User("Ada", 30)              # True
 
 # Variants
 @dataclass(frozen=True)           # immutable + hashable

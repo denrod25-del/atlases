@@ -555,7 +555,7 @@ const VFS_ROOT = {
     'home': {
       type: 'dir',
       children: {
-        'cle': {
+        'ada': {
           type: 'dir',
           children: {
             'README.md': { type: 'file', content: "# Welcome to Linux Atlas\n\nThis is your virtual home directory.\n\nTry: ls, cat, cd, pwd, find, grep.\n\nSee `help` for the full command list.\n" },
@@ -573,7 +573,7 @@ const VFS_ROOT = {
                 'pipeiq': {
                   type: 'dir',
                   children: {
-                    'README.md': { type: 'file', content: "# PipeIQ — Palm Beach County parcel lead scoring\n" },
+                    'README.md': { type: 'file', content: "# PipeIQ — county parcel lead scoring\n" },
                     'scrape.py': { type: 'file', content: "import requests\n\ndef fetch_parcels():\n    # PBC ArcGIS endpoint\n    pass\n" },
                   },
                 },
@@ -583,7 +583,7 @@ const VFS_ROOT = {
             '.ssh': {
               type: 'dir',
               children: {
-                'authorized_keys': { type: 'file', content: "ssh-ed25519 AAAA... cle@laptop\n" },
+                'authorized_keys': { type: 'file', content: "ssh-ed25519 AAAA... ada@laptop\n" },
               },
             },
           },
@@ -596,7 +596,7 @@ const VFS_ROOT = {
         'hostname': { type: 'file', content: "atlases-prod\n" },
         'os-release': { type: 'file', content: "NAME=\"Ubuntu\"\nVERSION=\"24.04 LTS (Noble Numbat)\"\nID=ubuntu\nVERSION_ID=\"24.04\"\n" },
         'fstab': { type: 'file', content: "# /etc/fstab\nUUID=abc-123  /        ext4  defaults  0 1\nUUID=def-456  /home    ext4  defaults  0 2\ntmpfs         /tmp     tmpfs defaults,size=2G  0 0\n" },
-        'passwd': { type: 'file', content: "root:x:0:0:root:/root:/bin/bash\ncle:x:1000:1000:Cle:/home/cle:/bin/bash\nwww-data:x:33:33:www-data:/var/www:/usr/sbin/nologin\n" },
+        'passwd': { type: 'file', content: "root:x:0:0:root:/root:/bin/bash\ncle:x:1000:1000:Ada:/home/ada:/bin/bash\nwww-data:x:33:33:www-data:/var/www:/usr/sbin/nologin\n" },
       },
     },
     'var': {
@@ -605,7 +605,7 @@ const VFS_ROOT = {
         'log': {
           type: 'dir',
           children: {
-            'syslog': { type: 'file', content: "May 25 14:23:01 atlases-prod systemd[1]: Started nginx.service.\nMay 25 14:23:05 atlases-prod nginx[1234]: TODO: rotate logs\nMay 25 14:25:12 atlases-prod sshd[1456]: Accepted publickey for cle\nMay 25 14:30:00 atlases-prod CRON[2001]: (cle) CMD (backup.sh)\nMay 25 14:30:08 atlases-prod kernel: [12345.678] eth0: link up\n" },
+            'syslog': { type: 'file', content: "May 25 14:23:01 atlases-prod systemd[1]: Started nginx.service.\nMay 25 14:23:05 atlases-prod nginx[1234]: TODO: rotate logs\nMay 25 14:25:12 atlases-prod sshd[1456]: Accepted publickey for ada\nMay 25 14:30:00 atlases-prod CRON[2001]: (ada) CMD (backup.sh)\nMay 25 14:30:08 atlases-prod kernel: [12345.678] eth0: link up\n" },
           },
         },
       },
@@ -621,9 +621,9 @@ const VFS_ROOT = {
 };
 
 const CHALLENGES = [
-  { id: 'pwd', title: '01 · Where am I?', desc: "Print your current working directory.", check: (s) => s.lastOutput?.trim() === '/home/cle', hint: "pwd" },
-  { id: 'ls', title: '02 · List the home directory', desc: "List the contents of /home/cle.", check: (s) => s.lastOutput?.includes('README.md') && s.lastOutput?.includes('projects'), hint: "ls (or ls /home/cle)" },
-  { id: 'cd', title: '03 · Navigate into projects/flowfirst', desc: "Change directory to ~/projects/flowfirst, then pwd.", check: (s) => s.cwd === '/home/cle/projects/flowfirst', hint: "cd projects/flowfirst" },
+  { id: 'pwd', title: '01 · Where am I?', desc: "Print your current working directory.", check: (s) => s.lastOutput?.trim() === '/home/ada', hint: "pwd" },
+  { id: 'ls', title: '02 · List the home directory', desc: "List the contents of /home/ada.", check: (s) => s.lastOutput?.includes('README.md') && s.lastOutput?.includes('projects'), hint: "ls (or ls /home/ada)" },
+  { id: 'cd', title: '03 · Navigate into projects/flowfirst', desc: "Change directory to ~/projects/flowfirst, then pwd.", check: (s) => s.cwd === '/home/ada/projects/flowfirst', hint: "cd projects/flowfirst" },
   { id: 'cat', title: '04 · Read the README', desc: "Display the contents of README.md (in your current dir).", check: (s) => s.lastOutput?.includes('FlowFirst'), hint: "cat README.md" },
   { id: 'grep', title: '05 · Find TODO in /var/log/syslog', desc: "Use grep to find lines containing 'TODO' in /var/log/syslog.", check: (s) => s.lastOutput?.includes('rotate logs'), hint: "grep TODO /var/log/syslog" },
   { id: 'find', title: '06 · Find all .md files under /home', desc: "Use find to locate every .md file under /home.", check: (s) => s.lastOutput?.match(/README\.md/g)?.length >= 3, hint: "find /home -name '*.md'" },
@@ -1255,7 +1255,7 @@ PubkeyAuthentication yes
 PermitRootLogin no                       # never as root
 
 # Limit who can SSH in
-AllowUsers cle deploy                    # whitelist
+AllowUsers ada deploy                    # whitelist
 AllowGroups ssh-users                    # or by group
 
 # Cryptography (allow only modern algorithms)
@@ -1300,7 +1300,7 @@ ssh-copy-id -i ~/.ssh/id_ed25519.pub user@server
 %sudo  ALL=(ALL:ALL) ALL                 # Debian/Ubuntu
 
 # Specific user, full sudo
-cle ALL=(ALL:ALL) ALL
+ada ALL=(ALL:ALL) ALL
 
 # No password for specific commands (use carefully)
 deploy ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart my-app
@@ -1800,7 +1800,7 @@ export default function LinuxAtlas() {
     const [challengeIdx, setChallengeIdx] = useState(0);
     const challenge = CHALLENGES[challengeIdx];
 
-    const [cwd, setCwd] = useState('/home/cle');
+    const [cwd, setCwd] = useState('/home/ada');
     const [history, setHistory] = useState([
       { kind: 'sys', text: "Linux Atlas mini-shell · Ubuntu-flavored virtual environment" },
       { kind: 'sys', text: "Try: ls, cd, cat, pwd, find, grep, echo, wc. Type `help` for full list.\n" },
@@ -1831,7 +1831,7 @@ export default function LinuxAtlas() {
       const stack = [];
       for (const p of parts) {
         if (p === '..') stack.pop();
-        else if (p === '~') { stack.length = 0; stack.push('home', 'cle'); }
+        else if (p === '~') { stack.length = 0; stack.push('home', 'ada'); }
         else if (p !== '.') stack.push(p);
       }
       const result = '/' + stack.join('/');
@@ -1874,19 +1874,19 @@ export default function LinuxAtlas() {
 Pipes (|) and redirects (>, >>) are supported in a limited form.`,
 
       pwd: () => cwd,
-      whoami: () => 'cle',
+      whoami: () => 'ada',
       'uname': (args) => args.includes('-a')
         ? 'Linux atlases-prod 7.0.10-generic #1 SMP PREEMPT_DYNAMIC x86_64 GNU/Linux'
         : 'Linux',
       date: () => new Date().toString(),
-      env: () => 'HOME=/home/cle\nUSER=cle\nSHELL=/bin/bash\nPATH=/usr/local/bin:/usr/bin:/bin\nPWD=' + cwd + '\nLANG=en_US.UTF-8',
+      env: () => 'HOME=/home/ada\nUSER=ada\nSHELL=/bin/bash\nPATH=/usr/local/bin:/usr/bin:/bin\nPWD=' + cwd + '\nLANG=en_US.UTF-8',
       history: () => cmdHistory.map((c, i) => `  ${(i + 1).toString().padStart(4)}  ${c}`).join('\n'),
       clear: () => { setHistory([]); return null; },
 
       echo: (args, raw) => {
         // strip surrounding quotes; handle $VAR limited
         const text = raw.replace(/^['"]|['"]$/g, '');
-        return text.replace(/\$(\w+)/g, (m, k) => ({ HOME: '/home/cle', USER: 'cle', PWD: cwd, SHELL: '/bin/bash' }[k] ?? m));
+        return text.replace(/\$(\w+)/g, (m, k) => ({ HOME: '/home/ada', USER: 'ada', PWD: cwd, SHELL: '/bin/bash' }[k] ?? m));
       },
 
       ls: (args) => {
@@ -1913,14 +1913,14 @@ Pipes (|) and redirects (>, >>) are supported in a limited form.`,
             const isDir = child.type === 'dir';
             const perms = isDir ? 'drwxr-xr-x' : '-rw-r--r--';
             const size = isDir ? '4096' : String(child.content?.length ?? 0).padStart(6);
-            return `${perms}  1 cle  cle  ${size}  May 25 14:00  ${name}${isDir ? '/' : ''}`;
+            return `${perms}  1 ada  ada  ${size}  May 25 14:00  ${name}${isDir ? '/' : ''}`;
           }).join('\n');
         }
         return entries.map(n => node.children[n].type === 'dir' ? n + '/' : n).join('  ');
       },
 
       cd: (args) => {
-        const path = args[0] || '/home/cle';
+        const path = args[0] || '/home/ada';
         const target = path === '-' ? cwd : resolvePath(path);
         const node = getNode(target);
         if (!node) return `cd: ${path}: No such file or directory`;
@@ -2122,7 +2122,7 @@ Pipes (|) and redirects (>, >>) are supported in a limited form.`,
     };
 
     const reset = () => {
-      setCwd('/home/cle');
+      setCwd('/home/ada');
       setHistory([{ kind: 'sys', text: "(reset)\n" }]);
       setCmdHistory([]);
       setLastOutput('');
@@ -2177,7 +2177,7 @@ Pipes (|) and redirects (>, >>) are supported in a limited form.`,
             if (h.kind === 'sys') return <div key={i} className="text-zinc-500 italic whitespace-pre-wrap">{h.text}</div>;
             if (h.kind === 'prompt') return (
               <div key={i} className="text-zinc-300">
-                <span className="text-green-400">cle@atlas</span>
+                <span className="text-green-400">ada@atlas</span>
                 <span className="text-zinc-500">:</span>
                 <span className="text-amber-300">{h.cwd || cwd}</span>
                 <span className="text-zinc-500">$</span> {h.text}
@@ -2186,7 +2186,7 @@ Pipes (|) and redirects (>, >>) are supported in a limited form.`,
             return <pre key={i} className="text-zinc-200 whitespace-pre-wrap">{h.text}</pre>;
           })}
           <div className="flex">
-            <span className="text-green-400">cle@atlas</span>
+            <span className="text-green-400">ada@atlas</span>
             <span className="text-zinc-500">:</span>
             <span className="text-amber-300">{cwd}</span>
             <span className="text-zinc-500">$&nbsp;</span>
@@ -2604,7 +2604,7 @@ Ctrl+D       EOF — exits shell if line is empty`}</Code>
 ├── boot/     kernel images, bootloader (GRUB)
 ├── dev/      device files (/dev/sda, /dev/null, /dev/random)
 ├── etc/      system-wide config files (/etc/hostname, /etc/fstab)
-├── home/     user home directories (/home/cle)
+├── home/     user home directories (/home/ada)
 ├── lib/      essential libraries — often → /usr/lib
 ├── media/    auto-mounted removable media
 ├── mnt/      manual mount points
@@ -2677,7 +2677,7 @@ find /path -xtype l         # broken symlinks`}</Code>
 
   PID 1: systemd                       (init — kernel starts this first)
    ├── PID 234: sshd                   (SSH server daemon)
-   │    └── PID 1456: sshd: cle@pts/0  (your SSH session)
+   │    └── PID 1456: sshd: ada@pts/0  (your SSH session)
    │         └── PID 1457: -bash       (your shell)
    │              └── PID 1789: vim    (a process YOU started)
    ├── PID 567: nginx                  (web server)
@@ -2792,7 +2792,7 @@ sudo visudo -f /etc/sudoers.d/deploy     # drop-in (preferred)
 
 # Common rule patterns:
 %sudo ALL=(ALL:ALL) ALL                  # sudo group: full
-cle ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart my-app   # one cmd, no pw
+ada ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart my-app   # one cmd, no pw
 
 # Capabilities — finer-grained than root/non-root
 # Splits root's powers into ~40 distinct capabilities
@@ -3047,7 +3047,7 @@ APPIMAGE — single file, no install
           <>
             <H2 num="◇ LIVE">A real mini-shell, in your browser</H2>
             <P>
-              The sandbox runs a working bash-like interpreter against a virtual filesystem populated with realistic content — /home/cle/projects (your real-world FlowFirst + PipeIQ), /etc/passwd, /var/log/syslog. Commands implemented: <Kbd>pwd</Kbd>, <Kbd>ls -la</Kbd>, <Kbd>cd</Kbd>, <Kbd>cat</Kbd>, <Kbd>echo</Kbd>, <Kbd>grep</Kbd>, <Kbd>find -name</Kbd>, <Kbd>head</Kbd>, <Kbd>tail</Kbd>, <Kbd>wc</Kbd>, <Kbd>whoami</Kbd>, <Kbd>uname -a</Kbd>, <Kbd>date</Kbd>, <Kbd>env</Kbd>, <Kbd>history</Kbd>, plus pipes (<Kbd>|</Kbd>). 8 challenges progress from <Kbd>pwd</Kbd> to chained filter-and-count.
+              The sandbox runs a working bash-like interpreter against a virtual filesystem populated with realistic content — /home/ada/projects (sample projects: FlowFirst + PipeIQ), /etc/passwd, /var/log/syslog. Commands implemented: <Kbd>pwd</Kbd>, <Kbd>ls -la</Kbd>, <Kbd>cd</Kbd>, <Kbd>cat</Kbd>, <Kbd>echo</Kbd>, <Kbd>grep</Kbd>, <Kbd>find -name</Kbd>, <Kbd>head</Kbd>, <Kbd>tail</Kbd>, <Kbd>wc</Kbd>, <Kbd>whoami</Kbd>, <Kbd>uname -a</Kbd>, <Kbd>date</Kbd>, <Kbd>env</Kbd>, <Kbd>history</Kbd>, plus pipes (<Kbd>|</Kbd>). 8 challenges progress from <Kbd>pwd</Kbd> to chained filter-and-count.
             </P>
             <Sandbox />
             <Callout kind="tip" title="REAL LINUX PRACTICE">

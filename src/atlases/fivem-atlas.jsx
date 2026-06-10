@@ -334,7 +334,7 @@ const COMPARISONS = {
     ],
   },
   timeout_causes: {
-    title: 'Client timeout causes — by frequency (Cle: this one is for you)',
+    title: 'Client timeout causes — by frequency',
     headers: ['Cause', 'Detection', 'Fix'],
     rows: [
       ['Client script blocks tick (no Wait)', "F8 console: 'resmon 1' shows the resource pegged near 100% client CPU", "Add Wait(0) or Wait(ms) inside any while-loop. Refactor long-running sync code into chunks."],
@@ -2438,7 +2438,7 @@ TriggerEvent('player:loaded', 'Mike', 'mechanic')
     const [manifest, setManifest] = useState({
       game: 'gta5',
       fx_version: 'cerulean',
-      author: 'Claw World RP',
+      author: 'Your Server',
       version: '1.0.0',
       description: 'Reputation system for gang members',
       shared_scripts: ['@ox_lib/init.lua', 'shared/config.lua'],
@@ -3540,7 +3540,7 @@ end)`,
               Former QBCore contributors forked the project as <Term>QBox</Term> (qbox-project, qbx_core). Goals: address performance, security, code quality. They built on the <Term name="ox_lib">Overextended</Term> ecosystem — ox_lib (utilities, UI), ox_inventory (inventory), oxmysql (DB), ox_target (interactions) — now maintained by CommunityOx after the original org wound down. Lua 5.4. Strict server-authority. Modular. Backwards-compatible with most QBCore resources.
             </P>
             <P>
-              June 2026: QBox is the recommended framework for new servers. QBCore still has the biggest script ecosystem and many production servers still run on it (Cle's Claw World RP included). Migration QBCore → QBox is a real ongoing trend; not necessary, but worth planning.
+              June 2026: QBox is the recommended framework for new servers. QBCore still has the biggest script ecosystem and many production servers still run on it. Migration QBCore → QBox is a real ongoing trend; not necessary, but worth planning.
             </P>
             <ComparisonTable data={COMPARISONS.frameworks_2026} />
             <div className="grid gap-2 my-3">
@@ -3549,8 +3549,8 @@ end)`,
               <CheckItem id="own-qbox-modern">QBox: modern fork, actively developed, built on ox_ ecosystem, Lua 5.4</CheckItem>
               <CheckItem id="own-onesync">OneSync (server-authoritative entity sync) is required above 32 players</CheckItem>
             </div>
-            <Callout kind="cite" title="WHY THIS MATTERS FOR CLE">
-              You're on QBCore. That's fine — Claw World RP works today. But know the landscape: when you start a new feature, ox_lib + ox_inventory + ox_target work on your QBCore stack, and they're the future. Adopt them piece-by-piece. When you eventually move to QBox, most of the migration will already be done.
+            <Callout kind="cite" title="WHY THIS MATTERS">
+              If you run a QBCore server, that's fine — it works today. But know the landscape: when you start a new feature, ox_lib + ox_inventory + ox_target work on your QBCore stack, and they're the future. Adopt them piece-by-piece. If you eventually move to QBox, most of the migration will already be done.
             </Callout>
             {QUIZZES.origin.map(q => <Quiz key={q.qid} quiz={q} />)}
           </>
@@ -3575,13 +3575,13 @@ end)`,
             <P>
               The manifest declares which scripts run server-side (<Kbd>server_scripts</Kbd>), client-side (<Kbd>client_scripts</Kbd>), or both (<Kbd>shared_scripts</Kbd>). The Sandbox has a working fxmanifest builder.
             </P>
-            <Code id="fxmanifest-example" lang="lua">{`-- Resource folder: claw-world-reputation/
+            <Code id="fxmanifest-example" lang="lua">{`-- Resource folder: gang-reputation/
 -- File: fxmanifest.lua
 
 fx_version 'cerulean'
 game 'gta5'
 
-author 'Claw World RP'
+author 'Your Server'
 description 'Reputation system for gang membership'
 version '1.0.0'
 
@@ -3967,7 +3967,7 @@ AddEventHandler('police:lockdown', function()
   -- proceed with lockdown logic
 end)
 
--- For Cle's Claw World gang systems:
+-- For RP gang systems:
 RegisterNetEvent('gang:claimTurf')
 AddEventHandler('gang:claimTurf', function(turfId)
   local src = source
@@ -4106,9 +4106,9 @@ async function buyItem(itemId, count) {
       case 10:
         return (
           <>
-            <H2 num="◇ TRIAGE">When something breaks on Claw World</H2>
+            <H2 num="◇ TRIAGE">When something breaks on your server</H2>
             <P>
-              Eight branches covering the most common FiveM production troubles. <strong>Client timeouts is the centerpiece</strong> — your active pain point. Each branch has a step-by-step diagnostic path.
+              Eight branches covering the most common FiveM production troubles. <strong>Client timeouts is the centerpiece</strong> — the most common live-server pain point. Each branch has a step-by-step diagnostic path.
             </P>
             <Troubleshooter />
             <H2 num="◇ TIMEOUT">The full client timeout cause table</H2>
@@ -4184,7 +4184,7 @@ async function buyItem(itemId, count) {
             <P>For your stack (<strong>{stackLabel || "—"}</strong>): {stackData?.spark || "pick a stack to personalize"}</P>
             <div className="grid gap-2 my-3 text-[13px]">
               {[
-                { wk: 'This week', plan: "Run resmon 1 during peak on Claw World. Screenshot the worst offenders. Investigate the top 1-2 resources eating CPU. Most servers have 1-2 resources eating 50%+ of the budget." },
+                { wk: 'This week', plan: "Run resmon 1 during peak on your server. Screenshot the worst offenders. Investigate the top 1-2 resources eating CPU. Most servers have 1-2 resources eating 50%+ of the budget." },
                 { wk: 'This week', plan: "Audit a few server-side event handlers. Look for: source vs client-supplied IDs, payload validation, parameterized SQL. Pick the most-fired event and harden it first." },
                 { wk: 'Next week', plan: "Add ox_lib as a dependency to your server.cfg if not already. Start replacing qb-menu calls with lib.registerContext. Replace QBCore.Functions.Notify with lib.notify. These work on QBCore today." },
                 { wk: 'Next week', plan: "Set up the mysql slow query log. Watch for 24 hours. The repeating slow queries are your DB optimization targets — add indexes on their WHERE columns." },
@@ -4232,7 +4232,7 @@ async function buyItem(itemId, count) {
             <Callout kind="info" title="THE END (AND THE BEGINNING)">
               You've walked from FiveM's origin (CFX.re, Rockstar acquisition) through the QBCore→QBox split, the server/client architecture, Lua fundamentals, the event system + the server-authority rule, fxmanifest + exports, oxmysql, framework patterns, NUI bridges. Live Lua interpreter you can run code in. Event flow simulator that visualizes what crosses the wire. fxmanifest builder.
 
-              The single biggest leverage move for Claw World RP: <strong>resmon 1 during peak, then harden the top 2 resources</strong>. Most servers have one or two bad actors eating most of the CPU budget. Fix them, the timeouts ease. The rest of the atlas is preventative — building the discipline so new code doesn't make it worse.
+              The single biggest leverage move for a live RP server: <strong>resmon 1 during peak, then harden the top 2 resources</strong>. Most servers have one or two bad actors eating most of the CPU budget. Fix them, the timeouts ease. The rest of the atlas is preventative — building the discipline so new code doesn't make it worse.
             </Callout>
           </>
         );

@@ -1424,7 +1424,7 @@ c.value = -5;   // setter clamps to 0
             <P>Every property has a descriptor: <Kbd>value</Kbd>, <Kbd>writable</Kbd>, <Kbd>enumerable</Kbd>, <Kbd>configurable</Kbd> (or <Kbd>get</Kbd>/<Kbd>set</Kbd> for accessors).</P>
             <Code id="descriptors">{`const obj = {};
 Object.defineProperty(obj, 'name', {
-  value: 'Cle',
+  value: 'Ada',
   writable: false,      // can't reassign
   enumerable: false,    // hidden from for-in, Object.keys
   configurable: false,  // can't delete or redefine
