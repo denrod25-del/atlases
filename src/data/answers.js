@@ -108,7 +108,7 @@ export const ANSWERS = [
     ],
     relatedAtlases: [
       { title: 'Databases atlas', path: '/atlas/db' },
-      { title: 'Databases at Scale', url: 'https://db-atlas.vercel.app' },
+      { title: 'Databases at Scale', url: 'https://db-atlas-two.vercel.app' },
     ],
     relatedTopics: ['backend-engineer-skills'],
   },

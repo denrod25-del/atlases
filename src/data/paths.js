@@ -19,7 +19,7 @@ export const LEARNING_PATHS = [
       { path: '/linux', title: 'Linux' },
       { url: 'https://api-atlas.vercel.app', title: 'API Foundations' },
       { url: 'https://security-atlas.vercel.app', title: 'API Security' },
-      { url: 'https://db-atlas.vercel.app', title: 'Databases at Scale' },
+      { url: 'https://db-atlas-two.vercel.app', title: 'Databases at Scale' },
       { url: 'https://prod-atlas.vercel.app', title: 'APIs in Production' },
     ],
     outcomes: [

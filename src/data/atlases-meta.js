@@ -238,7 +238,7 @@ export const EXTERNAL_ATLASES = [
     build: 'A resilient production-ready API deployment plan.',
   },
   {
-    external: true, url: 'https://db-atlas.vercel.app',
+    external: true, url: 'https://db-atlas-two.vercel.app',
     glyph: '▤', name: 'DB Scale', title: 'Databases at Scale',
     color: '#a5b4fc', accent: '#6ee7b7',
     sub: 'B-tree indexes, query planning, transaction isolation, replication.',
@@ -250,7 +250,7 @@ export const EXTERNAL_ATLASES = [
     build: 'A tuned schema + queries that solve a real performance problem.',
   },
   {
-    external: true, url: 'https://dist-atlas.vercel.app',
+    external: true, url: 'https://dist-atlas-theta.vercel.app',
     glyph: '⬢', name: 'Distributed', title: 'Distributed Systems',
     color: '#c4b5fd', accent: '#67e8f9',
     sub: 'Partial failure, consensus (Raft), vector clocks, quorum.',
@@ -262,7 +262,7 @@ export const EXTERNAL_ATLASES = [
     build: 'A written analysis of a real distributed-system tradeoff.',
   },
   {
-    external: true, url: 'https://event-atlas.vercel.app',
+    external: true, url: 'https://event-atlas-neon.vercel.app',
     glyph: '≋', name: 'Events', title: 'Event-Driven Architecture',
     color: '#f0abfc', accent: '#a3e635',
     sub: 'Queues vs streams, delivery semantics, log compaction, outbox pattern.',
