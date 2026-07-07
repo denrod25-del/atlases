@@ -4,25 +4,197 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="16 interactive learning atlases — databases, networking, Linux, crypto, compilers, AI engineering, Python, C++, Docker and more. Real in-browser sandboxes, quizzes, troubleshooting trees. No signup, no ads, progress saves locally." />
+    <meta name="color-scheme" content="dark" />
     <meta name="theme-color" content="#000000" />
-    <title>Atlases — interactive learning guides with real sandboxes</title>
+
+    <!-- Primary meta -->
+    <title>Atlases — Master Software Engineering Through Interactive Guides</title>
+    <meta name="description" content="Learn databases, Linux, networking, Docker, AI engineering, Python, C++, cryptography, and more through interactive chapter-based guides with real browser sandboxes. 16 atlases, 190+ chapters, no signup, no ads, free." />
+    <meta name="keywords" content="interactive learning, software engineering, databases, linux, docker, networking, python, c++, ai engineering, cryptography, compilers, browser sandbox, coding tutorials, developer education" />
+    <meta name="author" content="B. Symbolic · Atlases" />
+    <link rel="canonical" href="https://atlases.vercel.app/" />
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Atlases" />
+    <meta property="og:title" content="Atlases — Master Software Engineering Through Interactive Guides" />
+    <meta property="og:description" content="16 long-form interactive guides with real in-browser sandboxes (SQLite, CPython, live shell, Lua, PromQL), chapter-based teaching, no signup, no ads, free." />
     <meta property="og:url" content="https://atlases.vercel.app/" />
-    <meta property="og:title" content="Atlases — pick a topic, build the intuition" />
-    <meta property="og:description" content="16 long-form interactive guides with real in-browser sandboxes (SQLite, CPython, a live shell, Lua, PromQL), quizzes, and troubleshooting trees. No signup, no ads, free." />
     <meta property="og:image" content="https://atlases.vercel.app/og.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:site_name" content="Atlases" />
+    <meta property="og:image:alt" content="Atlases — 16 interactive learning atlases for software engineering" />
+    <meta property="og:locale" content="en_US" />
 
-    <!-- Twitter -->
+    <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Atlases — pick a topic, build the intuition" />
-    <meta name="twitter:description" content="16 long-form interactive guides with real in-browser sandboxes, quizzes, and troubleshooting trees. No signup, no ads, free." />
+    <meta name="twitter:title" content="Atlases — Interactive Software Engineering Learning" />
+    <meta name="twitter:description" content="Learn engineering through interactive chapters with real browser sandboxes. Zero setup. 16 atlases, 190+ chapters." />
     <meta name="twitter:image" content="https://atlases.vercel.app/og.png" />
+    <meta name="twitter:image:alt" content="Atlases — interactive software engineering learning platform" />
+
+    <!-- Fonts — preconnect for perf; the existing dynamic loader in Landing stays as fallback -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- Preload the critical Bricolage 600 face used by all headers -->
+    <link rel="preload" as="font" type="font/woff2" crossorigin
+      href="https://fonts.gstatic.com/s/bricolagegrotesque/v9/3y9U6as8bTXq_nANBjzKo3IeZx8z6up5BeSl5jBNz_2Y.woff2" />
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700&display=swap">
+
+    <!-- JSON-LD · Organization -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Atlases",
+      "alternateName": "B. Symbolic Atlases",
+      "url": "https://atlases.vercel.app",
+      "logo": "https://atlases.vercel.app/favicon.svg",
+      "description": "Interactive learning platform for software engineering. Chapter-based guides with real browser sandboxes.",
+      "sameAs": [
+        "https://github.com/denrod25-del"
+      ]
+    }
+    </script>
+
+    <!-- JSON-LD · WebSite (with SiteLinks Search Box) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Atlases",
+      "url": "https://atlases.vercel.app",
+      "description": "Master software engineering through interactive chapter-based guides with real browser sandboxes.",
+      "publisher": {
+        "@type": "Organization",
+        "name": "Atlases"
+      },
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://atlases.vercel.app/?q={search_term_string}"
+        },
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+
+    <!-- JSON-LD · Course (aggregate — the platform itself) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Course",
+      "name": "Atlases — Interactive Software Engineering",
+      "description": "16 chapter-based interactive guides covering databases, Linux, networking, Docker, AI engineering, Python, C++, cryptography, and more. Learn by building in real browser sandboxes.",
+      "provider": {
+        "@type": "Organization",
+        "name": "Atlases",
+        "sameAs": "https://atlases.vercel.app"
+      },
+      "hasCourseInstance": {
+        "@type": "CourseInstance",
+        "courseMode": "online",
+        "courseWorkload": "PT120H"
+      },
+      "offers": {
+        "@type": "Offer",
+        "category": "Free",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "educationalLevel": "beginner to advanced",
+      "teaches": [
+        "Databases and SQL", "Linux and shell", "Networking", "Docker and containers",
+        "AI engineering with LLMs", "Python", "JavaScript", "C++", "C",
+        "Cryptography", "Compilers", "Observability", "FiveM/Lua/QBCore",
+        "Character encoding", "n8n workflow automation", "Coolify self-hosted PaaS"
+      ]
+    }
+    </script>
+
+    <!-- JSON-LD · FAQPage (top 7 for AI-answer surfaces) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is Atlases?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Atlases is an interactive learning platform for software engineering. Each atlas is a chapter-based guide on one topic — databases, Linux, networking, Docker, AI engineering, and more — with real browser sandboxes where you practice concepts as you learn them."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Do I need to install anything to use Atlases?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. Every atlas runs in your browser. Terminals, code editors, databases, and simulators are all browser-based. You can start learning immediately from any device with a modern browser."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is Atlases beginner friendly?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. Each atlas lists its difficulty (Beginner, Intermediate, or Advanced) and its prerequisites. Beginners can start with foundational atlases like Python, Linux, or Encoding and progress from there."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Are the browser sandboxes real?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. The Python sandbox runs real CPython via Pyodide. C and C++ use JSCPP. SQL runs against real SQLite via sql.js. The Linux terminal is a working mini-shell. What you type actually runs and produces real output."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Which atlas should I start with?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Choose a Learning Path — Backend Engineering, AI Engineering, DevOps, or Computer Science — and the path recommends a starting atlas. If you are new to software engineering, start with Python or Linux."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How long does each atlas take to complete?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Each atlas has 12 chapters and takes 6 to 16 hours depending on your prior experience. You can complete an atlas across several evenings or knock out chapters in shorter sessions."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is Atlases free?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. All atlases are free and open access. No account required. Progress saves locally to your browser — no signup, no tracking, no ads."
+          }
+        }
+      ]
+    }
+    </script>
+
+    <!-- JSON-LD · BreadcrumbList -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://atlases.vercel.app/"
+        }
+      ]
+    }
+    </script>
   </head>
   <body class="bg-black">
     <div id="root"></div>
