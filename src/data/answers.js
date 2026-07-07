@@ -212,7 +212,7 @@ export const ANSWERS = [
       { title: 'Networking atlas', path: '/atlas/net' },
       { title: 'Linux atlas', path: '/atlas/linux' },
       { title: 'Docker atlas', path: '/atlas/docker' },
-      { title: 'API Foundations', url: 'https://api-atlas.vercel.app' },
+      { title: 'API Foundations', url: 'https://api-atlas-amber.vercel.app' },
     ],
     relatedTopics: ['what-is-linux', 'what-is-docker', 'what-is-a-database', 'what-is-networking'],
   },

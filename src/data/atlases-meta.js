@@ -202,7 +202,7 @@ export const CORE_ATLASES = [
 // Card links out with an external-link indicator.
 export const EXTERNAL_ATLASES = [
   {
-    external: true, url: 'https://api-atlas.vercel.app',
+    external: true, url: 'https://api-atlas-amber.vercel.app',
     glyph: '⊡', name: 'APIs', title: 'API Foundations',
     color: '#5eead4', accent: '#fb923c',
     sub: 'REST, versioning, error handling, pagination. Real API design decisions with tradeoffs made explicit.',
@@ -214,7 +214,7 @@ export const EXTERNAL_ATLASES = [
     build: 'A well-designed CRUD API spec with example requests and a written rationale.',
   },
   {
-    external: true, url: 'https://security-atlas.vercel.app',
+    external: true, url: 'https://security-atlas-zeta.vercel.app',
     glyph: '⛨', name: 'Security', title: 'API Security',
     color: '#67e8f9', accent: '#fb923c',
     sub: 'OAuth 2, JWT, threat modeling, rate limiting, injection defenses, TLS.',
