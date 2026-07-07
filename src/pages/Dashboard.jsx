@@ -25,8 +25,19 @@ import { CORE_ATLASES, ALL_ATLASES } from '../data/atlases-meta.js';
 import { STORAGE_PREFIX_TO_PATH, ATLAS_KEYS } from '../data/atlas-storage-map.js';
 import { LEARNING_PATHS } from '../data/paths.js';
 
+// Core atlases whose progress the dashboard can actually read.
+const TRACKED_PATHS = new Set(Object.values(STORAGE_PREFIX_TO_PATH));
+const TRACKED_ATLASES = CORE_ATLASES.filter(a => TRACKED_PATHS.has(a.path));
+
 // ─── Storage helpers ──────────────────────────────────────────────
 const STREAK_KEY = 'atlases-hub:streak';
+
+// Accessing localStorage throws SecurityError when browser storage is
+// disabled/blocked — treat that the same as "no saved progress".
+function safeGetItem(key) {
+  try { return localStorage.getItem(key); }
+  catch { return null; }
+}
 
 function readAtlasProgress() {
   const results = [];
@@ -36,9 +47,9 @@ function readAtlasProgress() {
     const atlas = CORE_ATLASES.find(a => a.path === atlasPath);
     if (!atlas) continue;
 
-    const rawCompleted = localStorage.getItem(prefix + ':' + ATLAS_KEYS.completed);
-    const rawActive    = localStorage.getItem(prefix + ':' + ATLAS_KEYS.activeSection);
-    const rawStack     = localStorage.getItem(prefix + ':' + ATLAS_KEYS.stack);
+    const rawCompleted = safeGetItem(prefix + ':' + ATLAS_KEYS.completed);
+    const rawActive    = safeGetItem(prefix + ':' + ATLAS_KEYS.activeSection);
+    const rawStack     = safeGetItem(prefix + ':' + ATLAS_KEYS.stack);
 
     let completedIds = [];
     if (rawCompleted) {
@@ -264,8 +275,12 @@ export default function Dashboard() {
   const inProgress = progress.filter(p => p.started && !p.finished);
   const finished   = progress.filter(p => p.finished);
   const totalChaptersDone = progress.reduce((s, p) => s + p.doneCount, 0);
-  const totalChaptersAvail = CORE_ATLASES.reduce((s, a) => s + a.chapters, 0);
-  const overallPct = Math.round((totalChaptersDone / totalChaptersAvail) * 100);
+  // Denominator counts only atlases with persisted progress (stateless
+  // Coolify is untracked) so completing every tracked atlas reads 100%.
+  const totalChaptersAvail = TRACKED_ATLASES.reduce((s, a) => s + a.chapters, 0);
+  const overallPct = totalChaptersAvail > 0
+    ? Math.round((totalChaptersDone / totalChaptersAvail) * 100)
+    : 0;
 
   const recommendation = loaded ? recommendNext(progress) : null;
   const isFirstVisit = loaded && started.length === 0;
